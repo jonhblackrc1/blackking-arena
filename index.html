@@ -20,11 +20,19 @@
     position:fixed; inset:0; display:flex; flex-direction:column;
     align-items:center; justify-content:center; text-align:center;
     background:radial-gradient(circle at 50% 40%, rgba(90,160,60,0.16), rgba(6,9,5,0.97));
-    color:#e8e6f5; z-index:10; padding:24px;
+    color:#e8e6f5; z-index:10; padding:24px; overflow-y:auto;
   }
   .overlay.hidden { display:none; }
   .hidden { display:none; }
   .lobbyView { display:flex; flex-direction:column; align-items:center; width:100%; }
+  .board { margin-top:12px; width:min(88vw,330px); font-size:14px; }
+  .board .row { display:flex; align-items:center; padding:3px 10px; border-radius:6px; }
+  .board .row:nth-child(even){ background:rgba(120,160,90,0.08); }
+  .board .rank { color:#8fbf7a; width:26px; text-align:left; font-weight:bold; }
+  .board .nm { flex:1; text-align:left; padding:0 8px; color:#e8e6f5; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .board .sc { color:#f5d77a; font-weight:bold; }
+  .board .empty { color:#7d77a3; font-size:13px; text-align:center; }
+  .board .me { background:rgba(245,215,122,0.16); }
   #lobbyScreen input::placeholder { color:#5a6b4a; }
   .title {
     font-size:clamp(38px,11vw,82px); font-weight:900; letter-spacing:4px;
@@ -98,6 +106,7 @@
   <div class="title">BLACKKING<br>ARENA</div>
   <div class="sub">ZOMBIE WASTELAND · 10 ZONES · 10 BOSSES</div>
   <div class="sub" id="hiscoreMenu" style="margin-top:8px;color:#f5d77a;font-weight:bold">HIGH SCORE: 0</div>
+  <div id="leaderboardMenu" class="board"></div>
   <div class="btnRow">
     <button class="btn" id="startBtn">SINGLE PLAYER</button>
     <button class="btn btn-alt" id="onlineBtn">ONLINE CO-OP</button>
@@ -113,6 +122,16 @@
 <div class="overlay hidden" id="overScreen">
   <div class="title" id="endmsg">YOU DIED</div>
   <div class="sub" id="overSub">The king has fallen in the arena</div>
+  <div id="saveRow" style="margin-top:14px;display:flex;flex-direction:column;align-items:center;gap:8px">
+    <div style="font-size:13px;color:#9bd48a;letter-spacing:1px">SAVE YOUR SCORE</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center">
+      <input id="nameInput" maxlength="12" placeholder="YOUR NAME" autocomplete="off"
+        style="text-transform:uppercase;text-align:center;letter-spacing:2px;font-size:18px;font-weight:bold;width:170px;padding:10px;border-radius:12px;border:2px solid #6a8c5a;background:#10160d;color:#e8f5e6">
+      <button class="btn" id="saveScoreBtn" style="margin-top:0;padding:10px 24px;font-size:16px">SAVE</button>
+    </div>
+    <div id="saveMsg" style="font-size:13px;color:#f5d77a;min-height:16px"></div>
+  </div>
+  <div id="leaderboardOver" class="board"></div>
   <div class="btnRow">
     <button class="btn" id="retryBtn">RETRY</button>
     <button class="btn btn-alt" id="quitBtn">QUIT</button>
@@ -288,7 +307,61 @@ let highScore=parseInt(localStorage.getItem('bk_highscore')||'0',10)||0;
 const scoreText=document.getElementById('scoreText');
 const hiscoreMenu=document.getElementById('hiscoreMenu');
 function addScore(pts){ score+=pts; if(scoreText) scoreText.textContent='SCORE '+score; }
-function updateMenuHiscore(){ if(hiscoreMenu) hiscoreMenu.textContent='HIGH SCORE: '+highScore; }
+
+// ---- Leaderboard: saved scores with names (local to this device) ----
+const leaderboardMenu=document.getElementById('leaderboardMenu');
+const leaderboardOver=document.getElementById('leaderboardOver');
+const nameInput=document.getElementById('nameInput');
+const saveScoreBtn=document.getElementById('saveScoreBtn');
+const saveMsg=document.getElementById('saveMsg');
+function loadScores(){ try{ return JSON.parse(localStorage.getItem('bk_scores')||'[]'); }catch(e){ return []; } }
+function persistScores(arr){ try{ localStorage.setItem('bk_scores', JSON.stringify(arr)); }catch(e){} }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function addScoreEntry(name, sc){
+  const arr=loadScores();
+  const entry={name:(name||'ANON').toUpperCase().slice(0,12), score:sc, t:Date.now()};
+  arr.push(entry);
+  arr.sort((a,b)=>b.score-a.score);
+  const top=arr.slice(0,20);
+  persistScores(top);
+  if(sc>highScore){ highScore=sc; localStorage.setItem('bk_highscore', String(highScore)); }
+  return { top, idx: top.indexOf(entry) };
+}
+function renderBoard(el, max, highlightIdx){
+  if(!el) return;
+  const arr=loadScores().slice(0, max||5);
+  if(!arr.length){ el.innerHTML='<div class="empty">No scores yet — be the first!</div>'; return; }
+  el.innerHTML = arr.map((e,i)=>
+    '<div class="row'+(i===highlightIdx?' me':'')+'">'+
+      '<span class="rank">'+(i+1)+'</span>'+
+      '<span class="nm">'+escapeHtml(e.name)+'</span>'+
+      '<span class="sc">'+e.score+'</span>'+
+    '</div>').join('');
+}
+function updateMenuHiscore(){
+  const top=loadScores();
+  if(top[0] && top[0].score>highScore) highScore=top[0].score;
+  if(hiscoreMenu) hiscoreMenu.textContent='HIGH SCORE: '+highScore;
+  renderBoard(leaderboardMenu, 5, -1);
+}
+function prepSaveRow(){
+  if(!nameInput) return;
+  nameInput.disabled=false; saveScoreBtn.disabled=false; saveScoreBtn.style.opacity='1';
+  nameInput.value = localStorage.getItem('bk_lastname')||'';
+  saveMsg.textContent='';
+  renderBoard(leaderboardOver, 8, -1);
+}
+function doSaveScore(){
+  if(!nameInput || nameInput.disabled) return;
+  const nm=(nameInput.value||'').trim();
+  if(!nm){ saveMsg.textContent='Enter a name first.'; nameInput.focus(); return; }
+  localStorage.setItem('bk_lastname', nm.toUpperCase().slice(0,12));
+  const res=addScoreEntry(nm, score);
+  saveMsg.innerHTML='✓ Saved! You are #'+(res.idx+1);
+  nameInput.disabled=true; saveScoreBtn.disabled=true; saveScoreBtn.style.opacity='0.5';
+  renderBoard(leaderboardOver, 8, res.idx);
+  renderBoard(leaderboardMenu, 5, -1);
+}
 
 function initPlayer(){ resetLocalPlayer(); }
 
@@ -725,6 +798,7 @@ function gameOver(win){
     overSub.innerHTML='The king has fallen in the arena'+scoreLine;
     retryBtn.textContent='RETRY';
   }
+  prepSaveRow();
   overScreen.classList.remove('hidden');
 }
 
@@ -1439,6 +1513,7 @@ function showClientGameOver(ov){
     '<div style="margin-top:14px;font-size:clamp(20px,6vw,30px);color:#f5d77a;font-weight:900">SCORE: '+score+'</div>'+
     '<div style="margin-top:4px;font-size:13px;color:#caa3ff">Waiting for the host…</div>';
   retryBtn.textContent='HOST RESTARTS';
+  prepSaveRow();
   overScreen.classList.remove('hidden');
 }
 function sendInput(){
@@ -1476,6 +1551,8 @@ document.getElementById('leaveRoomBtn').onclick=()=>{ netTeardown(); goToMenu();
 document.getElementById('copyLinkBtn').onclick=()=>{ shareLink.select(); try{ navigator.clipboard.writeText(shareLink.value); }catch(e){ try{document.execCommand('copy');}catch(_){} } document.getElementById('copyLinkBtn').textContent='COPIED!'; setTimeout(()=>document.getElementById('copyLinkBtn').textContent='COPY LINK',1500); };
 retryBtn.onclick=onRetry;
 quitBtn.onclick=quitToMenu;
+saveScoreBtn.onclick=doSaveScore;
+nameInput.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); doSaveScore(); } });
 
 state='menu';
 updateMenuHiscore();
