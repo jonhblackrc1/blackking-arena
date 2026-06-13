@@ -19,7 +19,7 @@
   .overlay {
     position:fixed; inset:0; display:flex; flex-direction:column;
     align-items:center; justify-content:center; text-align:center;
-    background:radial-gradient(circle at 50% 40%, rgba(120,60,200,0.18), rgba(7,8,15,0.97));
+    background:radial-gradient(circle at 50% 40%, rgba(90,160,60,0.16), rgba(6,9,5,0.97));
     color:#e8e6f5; z-index:10; padding:24px;
   }
   .overlay.hidden { display:none; }
@@ -93,7 +93,7 @@
 
 <div class="overlay" id="startScreen">
   <div class="title">BLACKKING<br>ARENA</div>
-  <div class="sub">10 LEVELS · 10 ALIEN BOSSES</div>
+  <div class="sub">ZOMBIE WASTELAND · 10 ZONES · 10 BOSSES</div>
   <div class="sub" id="hiscoreMenu" style="margin-top:8px;color:#f5d77a;font-weight:bold">HIGH SCORE: 0</div>
   <button class="btn" id="startBtn">PLAY</button>
   <div class="info">
@@ -164,8 +164,9 @@ const endmsg=document.getElementById('endmsg'), overSub=document.getElementById(
 const retryBtn=document.getElementById('retryBtn'), quitBtn=document.getElementById('quitBtn');
 
 // ---- World ----
-const MAP_W=2000, MAP_H=2000;
+const MAP_W=2800, MAP_H=2800;
 let cam={x:0,y:0};
+let decor=[]; // post-apocalyptic scenery (buildings, cars, debris, ...)
 function updateView(){ VW=W/ZOOM; VH=H/ZOOM; }
 updateView();
 
@@ -206,6 +207,30 @@ function updateMenuHiscore(){ if(hiscoreMenu) hiscoreMenu.textContent='HIGH SCOR
 
 function initPlayer(){
   player={x:MAP_W/2, y:MAP_H/2, r:16, hp:100, maxHp:100, speed:3.4, fireCD:0, dmg:1, dead:false, lives:3, invuln:0, aim:-Math.PI/2, flash:0, weapon:'pistol'};
+}
+
+// ---- Build the post-apocalyptic world (zombie wasteland) ----
+function buildWorld(){
+  decor=[];
+  const rnd=(a,b)=>a+Math.random()*(b-a);
+  const cx=MAP_W/2, cy=MAP_H/2;
+  // ground decals first (drawn flat under everything)
+  for(let i=0;i<70;i++) decor.push({type:'crack', x:rnd(0,MAP_W), y:rnd(0,MAP_H), len:rnd(40,150), a:rnd(0,Math.PI), w:rnd(1,2.5)});
+  for(let i=0;i<26;i++) decor.push({type:'blood', x:rnd(100,MAP_W-100), y:rnd(100,MAP_H-100), r:rnd(16,42), rot:rnd(0,6.28)});
+  for(let i=0;i<18;i++) decor.push({type:'scorch', x:rnd(120,MAP_W-120), y:rnd(120,MAP_H-120), r:rnd(28,60)});
+  // standing props — keep clear of the central spawn area
+  const away=(min)=>{ let x,y; do{ x=rnd(140,MAP_W-140); y=rnd(140,MAP_H-140);}while(Math.hypot(x-cx,y-cy)<min); return {x,y}; };
+  for(let i=0;i<18;i++){ const p=away(380); decor.push({type:'building', x:p.x, y:p.y, w:rnd(90,210), h:rnd(90,210), seed:Math.random()}); }
+  for(let i=0;i<12;i++){ const p=away(320); decor.push({type:'car', x:p.x, y:p.y, a:rnd(0,6.28), col:['#52602f','#7a3a28','#34424f','#5d4f2c','#404043'][i%5]}); }
+  for(let i=0;i<20;i++){ const p=away(240); decor.push({type:'barrel', x:p.x, y:p.y, lit:Math.random()<0.7}); }
+  for(let i=0;i<28;i++){ const p=away(200); decor.push({type:'rubble', x:p.x, y:p.y, r:rnd(13,30), seed:Math.random()}); }
+  for(let i=0;i<16;i++){ const p=away(240); decor.push({type:'tree', x:p.x, y:p.y, s:rnd(0.8,1.5), a:rnd(-0.3,0.3)}); }
+  // draw order: ground decals, then props sorted by y for fake depth
+  decor.sort((a,b)=>{
+    const ga=(a.type==='crack'||a.type==='blood'||a.type==='scorch')?0:1;
+    const gb=(b.type==='crack'||b.type==='blood'||b.type==='scorch')?0:1;
+    return ga!==gb ? ga-gb : a.y-b.y;
+  });
 }
 
 function startLevel(idx){
@@ -580,26 +605,143 @@ function gameOver(win){
 }
 
 // ---- Render ----
-function drawGrid(){
-  const tile=80;
-  ctx.strokeStyle='rgba(90,70,130,0.15)'; ctx.lineWidth=1;
+function inView(wx,wy,margin){
+  const sx=wx-cam.x, sy=wy-cam.y;
+  return sx>-margin && sx<VW+margin && sy>-margin && sy<VH+margin;
+}
+function drawGround(){
+  // cracked asphalt / dead earth base
+  ctx.fillStyle='#161512';
+  ctx.fillRect(-cam.x,-cam.y,MAP_W,MAP_H);
+  // faint concrete-slab seams
+  const tile=140;
+  ctx.strokeStyle='rgba(74,78,58,0.16)'; ctx.lineWidth=1.5;
   const sx=-cam.x%tile, sy=-cam.y%tile;
   ctx.beginPath();
   for(let x=sx;x<VW;x+=tile){ ctx.moveTo(x,0); ctx.lineTo(x,VH); }
   for(let y=sy;y<VH;y+=tile){ ctx.moveTo(0,y); ctx.lineTo(VW,y); }
   ctx.stroke();
-  // border walls
-  ctx.strokeStyle='rgba(176,124,255,0.5)'; ctx.lineWidth=4;
-  ctx.strokeRect(-cam.x,-cam.y,MAP_W,MAP_H);
+}
+function drawBoundary(){
+  // ruined perimeter wall with a toxic edge
+  ctx.save(); ctx.translate(-cam.x,-cam.y);
+  ctx.strokeStyle='#3a3326'; ctx.lineWidth=12; ctx.strokeRect(0,0,MAP_W,MAP_H);
+  ctx.strokeStyle='rgba(120,200,90,0.22)'; ctx.lineWidth=3; ctx.strokeRect(0,0,MAP_W,MAP_H);
+  ctx.restore();
+}
+function drawDecor(){
+  for(const d of decor){
+    if(!inView(d.x,d.y,140)) continue;
+    switch(d.type){
+      case 'crack':    drawCrack(d);    break;
+      case 'blood':    drawBlood(d);    break;
+      case 'scorch':   drawScorch(d);   break;
+      case 'building': drawBuilding(d); break;
+      case 'car':      drawCar(d);      break;
+      case 'barrel':   drawBarrel(d);   break;
+      case 'rubble':   drawRubble(d);   break;
+      case 'tree':     drawTree(d);     break;
+    }
+  }
+}
+function drawCrack(d){
+  ctx.save(); ctx.translate(d.x-cam.x,d.y-cam.y); ctx.rotate(d.a);
+  ctx.strokeStyle='rgba(0,0,0,0.5)'; ctx.lineWidth=d.w; ctx.lineCap='round';
+  ctx.beginPath();
+  const n=4, seg=d.len/n; let px=-d.len/2; ctx.moveTo(px,0);
+  for(let i=1;i<=n;i++){ px+=seg; ctx.lineTo(px, Math.sin(i*2.1+d.x*0.05)*5); }
+  ctx.stroke(); ctx.restore();
+}
+function drawBlood(d){
+  ctx.save(); ctx.translate(d.x-cam.x,d.y-cam.y); ctx.rotate(d.rot);
+  ctx.fillStyle='rgba(78,12,14,0.5)';
+  ctx.beginPath(); ctx.ellipse(0,0,d.r,d.r*0.7,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(90,14,16,0.45)';
+  for(let i=0;i<5;i++){ const a=i*1.3, rr=d.r*(0.85+i*0.1); ctx.beginPath(); ctx.arc(Math.cos(a)*rr,Math.sin(a)*rr,d.r*0.12,0,Math.PI*2); ctx.fill(); }
+  ctx.restore();
+}
+function drawScorch(d){
+  const x=d.x-cam.x, y=d.y-cam.y;
+  const g=ctx.createRadialGradient(x,y,0,x,y,d.r);
+  g.addColorStop(0,'rgba(0,0,0,0.5)'); g.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,d.r,0,Math.PI*2); ctx.fill();
+}
+function drawBuilding(d){
+  const x=d.x-cam.x, y=d.y-cam.y, w=d.w, h=d.h;
+  ctx.save(); ctx.translate(x,y);
+  ctx.fillStyle='rgba(0,0,0,0.4)'; ctx.fillRect(-w/2+7,-h/2+7,w,h);   // shadow
+  ctx.fillStyle='#2b2b30'; ctx.fillRect(-w/2,-h/2,w,h);               // concrete shell
+  ctx.strokeStyle='#141418'; ctx.lineWidth=3; ctx.strokeRect(-w/2,-h/2,w,h);
+  // window grid, a few lit toxic-green
+  const cols=Math.max(2,Math.floor(w/46)), rows=Math.max(2,Math.floor(h/46));
+  const gx=(w-28)/Math.max(1,cols-1), gy=(h-28)/Math.max(1,rows-1);
+  for(let i=0;i<cols;i++) for(let j=0;j<rows;j++){
+    const wx=-w/2+14+i*gx, wy=-h/2+14+j*gy;
+    const lit=((i*7+j*13+Math.floor(d.seed*97))%5)===0;
+    ctx.fillStyle= lit ? 'rgba(130,220,95,0.45)' : '#0d0d11';
+    ctx.fillRect(wx-6,wy-7,12,14);
+  }
+  // collapsed corner
+  ctx.fillStyle='#0c0c0f';
+  ctx.beginPath(); ctx.moveTo(w/2,-h/2); ctx.lineTo(w/2,-h/2+h*0.42); ctx.lineTo(w/2-w*0.38,-h/2); ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+function drawCar(d){
+  ctx.save(); ctx.translate(d.x-cam.x,d.y-cam.y); ctx.rotate(d.a);
+  const L=52, Wd=26;
+  ctx.fillStyle='rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.roundRect(-L/2+5,-Wd/2+5,L,Wd,7); ctx.fill();
+  ctx.fillStyle=d.col; ctx.beginPath(); ctx.roundRect(-L/2,-Wd/2,L,Wd,7); ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,0.45)'; ctx.lineWidth=2; ctx.stroke();
+  ctx.fillStyle='#1e1e22'; ctx.beginPath(); ctx.roundRect(-L*0.18,-Wd/2+4,L*0.42,Wd-8,4); ctx.fill(); // cabin
+  ctx.fillStyle='#0c0c0f'; ctx.fillRect(L*0.26,-Wd/2+5,5,Wd-10);    // broken windshield
+  ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(-L*0.22,0,L*0.16,Wd*0.4,0,0,Math.PI*2); ctx.fill(); // burn
+  ctx.restore();
+}
+function drawBarrel(d){
+  ctx.save(); ctx.translate(d.x-cam.x,d.y-cam.y);
+  if(d.lit){ ctx.globalAlpha=0.22; ctx.fillStyle='#7dff5a'; ctx.beginPath(); ctx.arc(0,0,18,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1; }
+  ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(2,4,11,9,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle= d.lit ? '#3f6a2f' : '#5a4a30'; ctx.beginPath(); ctx.arc(0,0,10,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,0.5)'; ctx.lineWidth=2; ctx.stroke();
+  ctx.strokeStyle= d.lit ? '#9dff5a' : '#7a6038'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(0,0,5.5,0,Math.PI*2); ctx.stroke();
+  ctx.restore();
+}
+function drawRubble(d){
+  ctx.save(); ctx.translate(d.x-cam.x,d.y-cam.y);
+  const r=d.r;
+  ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(2,2,r,r*0.7,0,0,Math.PI*2); ctx.fill();
+  const cols=['#3a3a40','#4a4640','#2e2e33'];
+  for(let i=0;i<5;i++){
+    const a=i*2.2+d.seed*6, rr=r*0.5;
+    ctx.save(); ctx.translate(Math.cos(a)*rr,Math.sin(a)*rr*0.7); ctx.rotate(a);
+    ctx.fillStyle=cols[i%3]; const s=r*0.42; ctx.fillRect(-s/2,-s/2,s,s*0.7);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+function drawTree(d){
+  const s=d.s;
+  ctx.save(); ctx.translate(d.x-cam.x,d.y-cam.y); ctx.rotate(d.a);
+  ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(3,3,10*s,7*s,0,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#2a2118'; ctx.lineCap='round';
+  ctx.lineWidth=5*s; ctx.beginPath(); ctx.moveTo(0,6*s); ctx.lineTo(0,-14*s); ctx.stroke();
+  ctx.lineWidth=3*s; ctx.beginPath();
+  ctx.moveTo(0,-4*s);  ctx.lineTo(-10*s,-14*s);
+  ctx.moveTo(0,-8*s);  ctx.lineTo(11*s,-16*s);
+  ctx.moveTo(0,-12*s); ctx.lineTo(-7*s,-22*s);
+  ctx.stroke();
+  ctx.restore();
 }
 function circle(x,y,r,col){ ctx.fillStyle=col; ctx.beginPath(); ctx.arc(x-cam.x,y-cam.y,r,0,Math.PI*2); ctx.fill(); }
 
 function render(){
-  ctx.fillStyle='#0b0d18'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#0a0b07'; ctx.fillRect(0,0,W,H);
   if(state==='menu'){ return; }
   ctx.save();
   ctx.scale(ZOOM,ZOOM);
-  drawGrid();
+  drawGround();
+  drawDecor();
+  drawBoundary();
 
   // particles
   for(const p of particles){
@@ -644,6 +786,13 @@ function render(){
   }
 
   ctx.restore();
+
+  // toxic atmosphere: greenish haze + dark vignette
+  const vg=ctx.createRadialGradient(W/2,H*0.45,Math.min(W,H)*0.28, W/2,H*0.5,Math.max(W,H)*0.78);
+  vg.addColorStop(0,'rgba(60,110,40,0.05)');
+  vg.addColorStop(0.6,'rgba(20,30,12,0.18)');
+  vg.addColorStop(1,'rgba(6,10,5,0.6)');
+  ctx.fillStyle=vg; ctx.fillRect(0,0,W,H);
 
   // on-screen controls
   drawControls();
@@ -930,7 +1079,7 @@ function startGame(){
   hud.style.display='flex';
   endmsg.style.fontSize='';
   score=0; addScore(0); // reset score display
-  initPlayer(); startLevel(0); state='play';
+  initPlayer(); buildWorld(); startLevel(0); state='play';
 }
 function goToMenu(){
   overScreen.classList.add('hidden');
