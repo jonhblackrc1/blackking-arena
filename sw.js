@@ -1,10 +1,11 @@
 // Blackking Arena service worker
-const CACHE = 'blackking-arena-v4';
+const CACHE = 'blackking-arena-v5';
 const ASSETS = [
   'index.html',
   'manifest.json',
   'icon-192.png',
-  'icon-512.png'
+  'icon-512.png',
+  'peerjs.min.js'
 ];
 
 // Install: cache the core files

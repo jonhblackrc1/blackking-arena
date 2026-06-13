@@ -23,6 +23,9 @@
     color:#e8e6f5; z-index:10; padding:24px;
   }
   .overlay.hidden { display:none; }
+  .hidden { display:none; }
+  .lobbyView { display:flex; flex-direction:column; align-items:center; width:100%; }
+  #lobbyScreen input::placeholder { color:#5a6b4a; }
   .title {
     font-size:clamp(38px,11vw,82px); font-weight:900; letter-spacing:4px;
     background:linear-gradient(180deg,#f5d77a,#b07cff);
@@ -95,7 +98,10 @@
   <div class="title">BLACKKING<br>ARENA</div>
   <div class="sub">ZOMBIE WASTELAND · 10 ZONES · 10 BOSSES</div>
   <div class="sub" id="hiscoreMenu" style="margin-top:8px;color:#f5d77a;font-weight:bold">HIGH SCORE: 0</div>
-  <button class="btn" id="startBtn">PLAY</button>
+  <div class="btnRow">
+    <button class="btn" id="startBtn">SINGLE PLAYER</button>
+    <button class="btn btn-alt" id="onlineBtn">ONLINE CO-OP</button>
+  </div>
   <div class="info">
     <b>Joystick</b> (left): drag to move your character in any direction.<br>
     <b>⚔ Button</b> (right): hold to fire at the nearest enemy.<br>
@@ -113,6 +119,51 @@
   </div>
 </div>
 
+<!-- ===== Online co-op lobby ===== -->
+<div class="overlay hidden" id="lobbyScreen">
+  <div class="title" style="font-size:clamp(28px,8vw,56px)">ONLINE CO-OP</div>
+
+  <!-- choose: host or join -->
+  <div id="lobbyChoice" class="lobbyView">
+    <div class="info" style="margin-top:10px">Play together in the same wasteland.<br>Create a room and share the link — or join a friend's.</div>
+    <div class="btnRow">
+      <button class="btn" id="createRoomBtn">CREATE ROOM</button>
+      <button class="btn btn-alt" id="joinRoomBtn">JOIN ROOM</button>
+    </div>
+    <button class="btn btn-alt" id="lobbyBackBtn" style="margin-top:18px;padding:10px 28px;font-size:15px">← BACK</button>
+  </div>
+
+  <!-- join: enter a code -->
+  <div id="lobbyJoin" class="lobbyView hidden">
+    <div class="sub" style="margin-top:14px">ENTER ROOM CODE</div>
+    <input id="codeInput" maxlength="6" placeholder="ABCD" autocomplete="off"
+      style="margin-top:12px;text-transform:uppercase;text-align:center;letter-spacing:6px;font-size:26px;font-weight:900;width:200px;padding:12px;border-radius:14px;border:2px solid #6a8c5a;background:#10160d;color:#e8f5e6">
+    <div class="btnRow">
+      <button class="btn" id="connectBtn">CONNECT</button>
+      <button class="btn btn-alt" id="joinBackBtn">← BACK</button>
+    </div>
+  </div>
+
+  <!-- waiting room (host & client) -->
+  <div id="lobbyRoom" class="lobbyView hidden">
+    <div class="sub" id="roomCodeLine" style="margin-top:8px"></div>
+    <div id="shareWrap" style="margin-top:10px;display:none">
+      <div class="info" style="margin:0">Share this link with your friends:</div>
+      <input id="shareLink" readonly onclick="this.select()"
+        style="margin-top:6px;width:min(86vw,360px);padding:10px;border-radius:10px;border:1px solid #4a5c3a;background:#10160d;color:#9bd48a;font-size:12px;text-align:center">
+      <button class="btn btn-alt" id="copyLinkBtn" style="margin-top:8px;padding:8px 22px;font-size:14px">COPY LINK</button>
+    </div>
+    <div class="sub" style="margin-top:16px;font-size:13px;color:#8fbf7a">PLAYERS</div>
+    <div id="playerList" style="margin-top:6px;color:#e8f5e6;font-size:15px;line-height:1.8;min-height:24px"></div>
+    <div id="lobbyStatus" class="info" style="margin-top:10px"></div>
+    <div class="btnRow">
+      <button class="btn hidden" id="startCoopBtn">START</button>
+      <button class="btn btn-alt" id="leaveRoomBtn">LEAVE</button>
+    </div>
+  </div>
+</div>
+
+<script src="peerjs.min.js"></script>
 <script>
 // roundRect polyfill (older mobile browsers)
 if(!CanvasRenderingContext2D.prototype.roundRect){
@@ -194,8 +245,39 @@ const WEAPONS={
 };
 const WEAPON_KEYS=['rifle','shotgun','smg'];
 
-let player, level, boss, bossSpawned, state;
+let level, boss, bossSpawned, state;
 let enemies=[], bullets=[], eBullets=[], particles=[], pickups=[];
+
+// ---- Players (1 in single-player; several in online co-op) ----
+let players=[];        // every player in the simulation
+let player=null;       // the local player on this device (camera follows it)
+let localPlayer=null;  // alias of player
+const PLAYER_COLORS=['#f5d77a','#5ad1ff','#5aff8a','#ff7ad1','#caa3ff','#ffae42'];
+let nameCounter=0;
+function makePlayer(id,isLocal,colorIdx,name){
+  return {id, isLocal:!!isLocal, color:PLAYER_COLORS[(colorIdx||0)%PLAYER_COLORS.length],
+    name: name||('P'+((colorIdx||0)+1)),
+    x:MAP_W/2, y:MAP_H/2, r:16, hp:100, maxHp:100, speed:3.4, fireCD:0, dmg:1,
+    dead:false, out:false, lives:3, invuln:0, aim:-Math.PI/2, flash:0, weapon:'pistol',
+    input:{mx:0,my:0,atk:false}};
+}
+function resetLocalPlayer(){
+  player = makePlayer((net&&net.myId)||'local', true, 0, 'YOU');
+  localPlayer = player;
+  players = [player];
+}
+
+// ---- Networking state (PeerJS, host-authoritative co-op) ----
+let net={ mode:'off', peer:null, conns:[], myId:null, roomId:null, snapshot:null, lastSend:0, lastInput:0 };
+let lastWin=false;
+const PEER_CONFIG={ debug:1, config:{ iceServers:[
+  {urls:'stun:stun.l.google.com:19302'},
+  {urls:'stun:stun1.l.google.com:19302'},
+  {urls:'turn:openrelay.metered.ca:80', username:'openrelayproject', credential:'openrelayproject'},
+  {urls:'turn:openrelay.metered.ca:443', username:'openrelayproject', credential:'openrelayproject'},
+  {urls:'turn:openrelay.metered.ca:443?transport=tcp', username:'openrelayproject', credential:'openrelayproject'}
+]}};
+function alivePlayers(){ return players.filter(p=>!p.out); }
 
 // ---- Score ----
 let score=0;
@@ -205,9 +287,7 @@ const hiscoreMenu=document.getElementById('hiscoreMenu');
 function addScore(pts){ score+=pts; if(scoreText) scoreText.textContent='SCORE '+score; }
 function updateMenuHiscore(){ if(hiscoreMenu) hiscoreMenu.textContent='HIGH SCORE: '+highScore; }
 
-function initPlayer(){
-  player={x:MAP_W/2, y:MAP_H/2, r:16, hp:100, maxHp:100, speed:3.4, fireCD:0, dmg:1, dead:false, lives:3, invuln:0, aim:-Math.PI/2, flash:0, weapon:'pistol'};
-}
+function initPlayer(){ resetLocalPlayer(); }
 
 // ---- Build the post-apocalyptic world (zombie wasteland) ----
 function buildWorld(){
@@ -238,11 +318,18 @@ function startLevel(idx){
   const cfg=LEVELS[idx];
   enemies=[]; bullets=[]; eBullets=[]; particles=[]; pickups=[];
   boss=null; bossSpawned=false;
-  player.x=MAP_W/2; player.y=MAP_H/2;
+  // place all players near the centre (spread in a small ring), refill their health
+  players.forEach((p,i)=>{
+    const ang=(i/Math.max(1,players.length))*Math.PI*2;
+    p.x=MAP_W/2+Math.cos(ang)*(players.length>1?60:0);
+    p.y=MAP_H/2+Math.sin(ang)*(players.length>1?60:0);
+    if(!p.out){ p.hp=p.maxHp; p.invuln=60; }
+  });
+  const cX=MAP_W/2, cY=MAP_H/2;
   for(let i=0;i<cfg.enemies;i++){
     let x,y,d;
     do{ x=Math.random()*MAP_W; y=Math.random()*MAP_H;
-        d=Math.hypot(x-player.x,y-player.y);
+        d=Math.hypot(x-cX,y-cY);
     }while(d<350);
     enemies.push({x,y,r:13,hp:cfg.ehp,maxHp:cfg.ehp,speed:cfg.espeed,shoot:cfg.eShoot,boss:false,fireCD:Math.random()*100});
   }
@@ -265,14 +352,15 @@ function startLevel(idx){
 function spawnPickup(kind, weapon){
   let x,y,d;
   do{ x=120+Math.random()*(MAP_W-240); y=120+Math.random()*(MAP_H-240);
-      d=Math.hypot(x-player.x,y-player.y);
+      d=Math.hypot(x-MAP_W/2,y-MAP_H/2);
   }while(d<260);
   return {x,y,r:16,kind,weapon,bob:Math.random()*Math.PI*2};
 }
 
 function spawnBoss(){
   const b=LEVELS[level].boss;
-  boss={x:player.x, y:player.y-450, r:42, hp:b.hp, maxHp:b.hp, speed:b.speed,
+  const ref=alivePlayers()[0]||{x:MAP_W/2,y:MAP_H/2};
+  boss={x:ref.x, y:ref.y-450, r:42, hp:b.hp, maxHp:b.hp, speed:b.speed,
         fireRate:b.fireRate, fireCD:60, color:b.color, name:b.name, boss:true, pattern:0};
   if(boss.y<60) boss.y=60;
   enemies.push(boss);
@@ -366,13 +454,18 @@ window.addEventListener('mouseup',e=>{ releasePoint('m'); });
 const keys={};
 const GAME_KEYS=['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',' ','k'];
 window.addEventListener('keydown',e=>{
+  // don't hijack keys while typing in a text field (e.g. the room code)
+  if(document.activeElement && document.activeElement.tagName==='INPUT') return;
   if(e.repeat){ if(GAME_KEYS.includes(e.key.toLowerCase())) e.preventDefault(); return; }
   const k=e.key.toLowerCase();
   keys[k]=true;
   // Enter / Space starts or restarts the game from the menu & game-over screens
   if((k==='enter'||k===' ') && state!=='play'){
-    if(!startScreen.classList.contains('hidden')) startGame();
-    else if(!overScreen.classList.contains('hidden')) startGame();
+    const lobbyOpen = !lobbyScreen.classList.contains('hidden');
+    if(!lobbyOpen){
+      if(!startScreen.classList.contains('hidden') && net.mode==='off') startGame();
+      else if(!overScreen.classList.contains('hidden')) onRetry();
+    }
   }
   // keep arrows/space from scrolling the page, and drop focus off any button
   if(GAME_KEYS.includes(k)){
@@ -392,181 +485,193 @@ function spawnParticles(x,y,color,n){
 // Fixed circular attack range, same in every direction.
 // Uses half the smaller visible dimension so the range always fits on screen.
 function attackRange(){ return (Math.min(VW, VH) / 2) * 1.25; }
-function nearestEnemy(){
+// nearest enemy within the given player's attack radius
+function nearestEnemyTo(p){
   let best=null,bd=1e9;
   const range=attackRange();
   for(const e of enemies){
-    const d=Math.hypot(e.x-player.x,e.y-player.y);
+    const d=Math.hypot(e.x-p.x,e.y-p.y);
     if(d-e.r > range) continue; // outside the circular attack radius
     if(d<bd){bd=d;best=e;}
   }
   return best;
 }
-
-// ---- Update ----
-function update(){
-  if(state!=='play') return;
-
-  // Player movement
+// nearest living player to an enemy (so enemies chase whoever is closest)
+function nearestPlayerTo(e){
+  let best=null,bd=1e9;
+  for(const p of players){
+    if(p.out) continue;
+    const d=Math.hypot(p.x-e.x,p.y-e.y);
+    if(d<bd){bd=d;best=p;}
+  }
+  return best;
+}
+// read this device's local input (joystick + keyboard)
+function readLocalInput(){
   let mx=moveVec.x, my=moveVec.y;
   if(keys['w']||keys['arrowup'])my-=1;
   if(keys['s']||keys['arrowdown'])my+=1;
   if(keys['a']||keys['arrowleft'])mx-=1;
   if(keys['d']||keys['arrowright'])mx+=1;
-  const mm=Math.hypot(mx,my);
-  if(mm>0){ mx/=mm; my/=mm; const sp=player.speed;
-    player.x+=mx*sp; player.y+=my*sp; }
-  player.x=Math.max(player.r,Math.min(MAP_W-player.r,player.x));
-  player.y=Math.max(player.r,Math.min(MAP_H-player.r,player.y));
+  return {mx,my, atk: attackHeld||keys[' ']||keys['k']};
+}
 
-  // Update camera now so on-screen targeting is accurate this frame
-  cam.x=player.x-VW/2; cam.y=player.y-VH/2;
-  cam.x=Math.max(0,Math.min(MAP_W-VW,cam.x));
-  cam.y=Math.max(0,Math.min(MAP_H-VH,cam.y));
-  if(MAP_W<VW) cam.x=(MAP_W-VW)/2;
-  if(MAP_H<VH) cam.y=(MAP_H-VH)/2;
+// ---- Update ----
+function update(){
+  // CLIENT: don't simulate — send input, render from the host's snapshot
+  if(net.mode==='client'){ clientUpdate(); return; }
 
-  // Shoot nearest (hold attack button, or space on desktop)
-  player.fireCD--;
-  const wantShoot = attackHeld || keys[' '] || keys['k'];
-  if(player.fireCD<=0 && wantShoot){
-    const tgt=nearestEnemy();
-    if(tgt){
-      const w=WEAPONS[player.weapon];
-      const base=Math.atan2(tgt.y-player.y,tgt.x-player.x);
-      for(let p=0;p<w.pellets;p++){
-        // spread shots evenly around the aim, plus a little randomness
-        const off = w.pellets>1 ? (p-(w.pellets-1)/2)*(w.spread/Math.max(1,w.pellets-1)) : 0;
-        const a = base + off + (Math.random()-0.5)*(w.spread*0.15);
-        bullets.push({x:player.x,y:player.y,vx:Math.cos(a)*w.speed,vy:Math.sin(a)*w.speed,r:5,dmg:w.dmg,life:80,color:w.color});
-      }
-      player.fireCD=w.fireRate;
-      player.flash=5;
-    }
-  }
-
-  // Aim direction: face nearest visible enemy, else face movement direction
-  const aimTgt=nearestEnemy();
-  if(aimTgt){
-    player.aim=Math.atan2(aimTgt.y-player.y,aimTgt.x-player.x);
-  } else if(mm>0){
-    player.aim=Math.atan2(my,mx);
-  }
-
-  // Bullets (player)
-  for(let i=bullets.length-1;i>=0;i--){
-    const b=bullets[i]; b.x+=b.vx; b.y+=b.vy; b.life--;
-    let hit=false;
-    for(const e of enemies){
-      if(Math.hypot(e.x-b.x,e.y-b.y)<e.r+b.r){
-        e.hp-=b.dmg; spawnParticles(b.x,b.y,'#f5d77a',6); hit=true; break;
-      }
-    }
-    if(hit||b.life<=0||b.x<0||b.y<0||b.x>MAP_W||b.y>MAP_H) bullets.splice(i,1);
-  }
-
-  // Enemies
-  for(let i=enemies.length-1;i>=0;i--){
-    const e=enemies[i];
-    const a=Math.atan2(player.y-e.y,player.x-e.x);
-    const dist=Math.hypot(player.x-e.x,player.y-e.y);
-    if(e.boss){
-      e.x+=Math.cos(a)*e.speed; e.y+=Math.sin(a)*e.speed;
-      e.fireCD--;
-      if(e.fireCD<=0){
-        e.pattern=(e.pattern+1)%3;
-        const bn=(e.pattern===2)?12:6, spread=(e.pattern===1)?0.5:0;
-        for(let k=0;k<bn;k++){
-          let ang;
-          if(e.pattern===2) ang=(k/bn)*Math.PI*2;
-          else ang=a+(k-bn/2)*spread*0.2;
-          eBullets.push({x:e.x,y:e.y,vx:Math.cos(ang)*4.5,vy:Math.sin(ang)*4.5,r:6,life:140,color:e.color});
+  if(state==='play'){
+    // ---- Players: movement, aim, shooting ----
+    for(const p of players){
+      if(p.out) continue;
+      const inp = p.isLocal ? readLocalInput() : p.input;
+      const mm=Math.hypot(inp.mx,inp.my);
+      let nmx=inp.mx, nmy=inp.my;
+      if(mm>0){ nmx/=mm; nmy/=mm; p.x+=nmx*p.speed; p.y+=nmy*p.speed; }
+      p.x=Math.max(p.r,Math.min(MAP_W-p.r,p.x));
+      p.y=Math.max(p.r,Math.min(MAP_H-p.r,p.y));
+      // shoot nearest enemy in range
+      p.fireCD--;
+      if(p.fireCD<=0 && inp.atk){
+        const tgt=nearestEnemyTo(p);
+        if(tgt){
+          const w=WEAPONS[p.weapon];
+          const base=Math.atan2(tgt.y-p.y,tgt.x-p.x);
+          for(let k=0;k<w.pellets;k++){
+            const off = w.pellets>1 ? (k-(w.pellets-1)/2)*(w.spread/Math.max(1,w.pellets-1)) : 0;
+            const a = base + off + (Math.random()-0.5)*(w.spread*0.15);
+            bullets.push({x:p.x,y:p.y,vx:Math.cos(a)*w.speed,vy:Math.sin(a)*w.speed,r:5,dmg:w.dmg,life:80,color:w.color});
+          }
+          p.fireCD=w.fireRate; p.flash=5;
         }
-        e.fireCD=e.fireRate;
       }
-    } else {
-      e.x+=Math.cos(a)*e.speed; e.y+=Math.sin(a)*e.speed;
-      e.fireCD--;
-      if(Math.random()<e.shoot && e.fireCD<=0){
-        eBullets.push({x:e.x,y:e.y,vx:Math.cos(a)*4,vy:Math.sin(a)*4,r:5,life:120,color:'#9dff5a'});
-        e.fireCD=40;
-      }
+      // aim: face nearest enemy, else movement direction
+      const at=nearestEnemyTo(p);
+      if(at) p.aim=Math.atan2(at.y-p.y,at.x-p.x);
+      else if(mm>0) p.aim=Math.atan2(nmy,nmx);
+      if(p.flash>0)p.flash--;
+      if(p.invuln>0)p.invuln--;
     }
-    // touch damage
-    if(dist<e.r+player.r && player.invuln<=0){ player.hp-=e.boss?0.5:0.25; }
-    // death
-    if(e.hp<=0){
-      spawnParticles(e.x,e.y,e.boss?e.color:'#caa3ff',e.boss?40:14);
-      enemies.splice(i,1);
-      if(e.boss){
-        addScore(1000+level*250);
-        boss=null; bossSpawned=false; bossWrap.classList.remove('show'); levelClear();
-      } else {
-        addScore(100);
-      }
+
+    // camera follows the local player
+    if(localPlayer){
+      cam.x=localPlayer.x-VW/2; cam.y=localPlayer.y-VH/2;
+      cam.x=Math.max(0,Math.min(MAP_W-VW,cam.x));
+      cam.y=Math.max(0,Math.min(MAP_H-VH,cam.y));
+      if(MAP_W<VW) cam.x=(MAP_W-VW)/2;
+      if(MAP_H<VH) cam.y=(MAP_H-VH)/2;
     }
-  }
 
-  // Enemy bullets
-  for(let i=eBullets.length-1;i>=0;i--){
-    const b=eBullets[i]; b.x+=b.vx; b.y+=b.vy; b.life--;
-    if(Math.hypot(player.x-b.x,player.y-b.y)<player.r+b.r){
-      if(player.invuln<=0) player.hp-=6;
-      spawnParticles(b.x,b.y,'#ff5a7a',8); eBullets.splice(i,1); continue;
-    }
-    if(b.life<=0||b.x<0||b.y<0||b.x>MAP_W||b.y>MAP_H) eBullets.splice(i,1);
-  }
-
-  // Particles
-  for(let i=particles.length-1;i>=0;i--){
-    const p=particles[i]; p.x+=p.vx; p.y+=p.vy; p.vx*=0.92; p.vy*=0.92; p.life-=0.04;
-    if(p.life<=0) particles.splice(i,1);
-  }
-
-  // Pickups (walk over to collect)
-  for(let i=pickups.length-1;i>=0;i--){
-    const pk=pickups[i];
-    pk.bob+=0.08;
-    if(Math.hypot(pk.x-player.x,pk.y-player.y) < pk.r+player.r){
-      if(pk.kind==='health'){
-        player.hp=Math.min(player.maxHp, player.hp+40);
-        spawnParticles(pk.x,pk.y,'#5aff8a',16);
-        showToast('+40 HP');
-      } else if(pk.kind==='weapon'){
-        player.weapon=pk.weapon;
-        spawnParticles(pk.x,pk.y,WEAPONS[pk.weapon].color,16);
-        showToast(WEAPONS[pk.weapon].name+'!');
-      }
-      pickups.splice(i,1);
-    }
-  }
-
-  // Spawn boss when all minions dead
-  if(!bossSpawned && enemies.filter(e=>!e.boss).length===0) spawnBoss();
-
-  // Invulnerability timer
-  if(player.invuln>0) player.invuln--;
-  if(player.flash>0) player.flash--;
-
-  // Player loses a life
-  if(player.hp<=0 && !player.dead){
-    player.lives--;
-    if(player.lives<=0){
-      player.dead=true; gameOver(false);
-    } else {
-      // respawn: refill hp, brief invulnerability, push enemies back
-      player.hp=player.maxHp;
-      player.invuln=120;
-      spawnParticles(player.x,player.y,'#f5d77a',30);
+    // ---- Player bullets ----
+    for(let i=bullets.length-1;i>=0;i--){
+      const b=bullets[i]; b.x+=b.vx; b.y+=b.vy; b.life--;
+      let hit=false;
       for(const e of enemies){
-        const a=Math.atan2(e.y-player.y,e.x-player.x);
-        const d=Math.hypot(e.x-player.x,e.y-player.y);
-        if(d<260){ e.x+=Math.cos(a)*(260-d); e.y+=Math.sin(a)*(260-d); }
+        if(Math.hypot(e.x-b.x,e.y-b.y)<e.r+b.r){ e.hp-=b.dmg; spawnParticles(b.x,b.y,'#f5d77a',6); hit=true; break; }
+      }
+      if(hit||b.life<=0||b.x<0||b.y<0||b.x>MAP_W||b.y>MAP_H) bullets.splice(i,1);
+    }
+
+    // ---- Enemies (chase the nearest living player) ----
+    for(let i=enemies.length-1;i>=0;i--){
+      const e=enemies[i];
+      const tp=nearestPlayerTo(e);
+      const a = tp ? Math.atan2(tp.y-e.y,tp.x-e.x) : 0;
+      const dist = tp ? Math.hypot(tp.x-e.x,tp.y-e.y) : 1e9;
+      if(e.boss){
+        e.x+=Math.cos(a)*e.speed; e.y+=Math.sin(a)*e.speed;
+        e.fireCD--;
+        if(e.fireCD<=0){
+          e.pattern=(e.pattern+1)%3;
+          const bn=(e.pattern===2)?12:6, spread=(e.pattern===1)?0.5:0;
+          for(let k=0;k<bn;k++){
+            let ang;
+            if(e.pattern===2) ang=(k/bn)*Math.PI*2;
+            else ang=a+(k-bn/2)*spread*0.2;
+            eBullets.push({x:e.x,y:e.y,vx:Math.cos(ang)*4.5,vy:Math.sin(ang)*4.5,r:6,life:140,color:e.color});
+          }
+          e.fireCD=e.fireRate;
+        }
+      } else {
+        e.x+=Math.cos(a)*e.speed; e.y+=Math.sin(a)*e.speed;
+        e.fireCD--;
+        if(Math.random()<e.shoot && e.fireCD<=0){
+          eBullets.push({x:e.x,y:e.y,vx:Math.cos(a)*4,vy:Math.sin(a)*4,r:5,life:120,color:'#9dff5a'});
+          e.fireCD=40;
+        }
+      }
+      // touch damage to the targeted player
+      if(tp && dist<e.r+tp.r && tp.invuln<=0){ tp.hp-=e.boss?0.5:0.25; }
+      // death
+      if(e.hp<=0){
+        spawnParticles(e.x,e.y,e.boss?e.color:'#caa3ff',e.boss?40:14);
+        enemies.splice(i,1);
+        if(e.boss){ addScore(1000+level*250); boss=null; bossSpawned=false; bossWrap.classList.remove('show'); levelClear(); }
+        else { addScore(100); }
       }
     }
+
+    // ---- Enemy bullets (hit any living player) ----
+    for(let i=eBullets.length-1;i>=0;i--){
+      const b=eBullets[i]; b.x+=b.vx; b.y+=b.vy; b.life--;
+      let hit=false;
+      for(const p of players){
+        if(p.out) continue;
+        if(Math.hypot(p.x-b.x,p.y-b.y)<p.r+b.r){ if(p.invuln<=0) p.hp-=6; spawnParticles(b.x,b.y,'#ff5a7a',8); hit=true; break; }
+      }
+      if(hit){ eBullets.splice(i,1); continue; }
+      if(b.life<=0||b.x<0||b.y<0||b.x>MAP_W||b.y>MAP_H) eBullets.splice(i,1);
+    }
+
+    // ---- Particles ----
+    for(let i=particles.length-1;i>=0;i--){
+      const p=particles[i]; p.x+=p.vx; p.y+=p.vy; p.vx*=0.92; p.vy*=0.92; p.life-=0.04;
+      if(p.life<=0) particles.splice(i,1);
+    }
+
+    // ---- Pickups (any living player can grab) ----
+    for(let i=pickups.length-1;i>=0;i--){
+      const pk=pickups[i]; pk.bob+=0.08;
+      let taken=false;
+      for(const p of players){
+        if(p.out) continue;
+        if(Math.hypot(pk.x-p.x,pk.y-p.y) < pk.r+p.r){
+          if(pk.kind==='health'){ p.hp=Math.min(p.maxHp,p.hp+40); spawnParticles(pk.x,pk.y,'#5aff8a',16); if(p.isLocal) showToast('+40 HP'); }
+          else if(pk.kind==='weapon'){ p.weapon=pk.weapon; spawnParticles(pk.x,pk.y,WEAPONS[pk.weapon].color,16); if(p.isLocal) showToast(WEAPONS[pk.weapon].name+'!'); }
+          taken=true; break;
+        }
+      }
+      if(taken) pickups.splice(i,1);
+    }
+
+    // spawn boss when all minions dead
+    if(!bossSpawned && enemies.filter(e=>!e.boss).length===0) spawnBoss();
+
+    // ---- Deaths / respawns (per player) ----
+    for(const p of players){
+      if(p.out) continue;
+      if(p.hp<=0){
+        p.lives--;
+        if(p.lives<=0){ p.out=true; p.dead=true; p.hp=0; spawnParticles(p.x,p.y,'#ff5a7a',30); if(p.isLocal) showToast('DOWNED'); }
+        else {
+          p.hp=p.maxHp; p.invuln=120; spawnParticles(p.x,p.y,'#f5d77a',30);
+          for(const e of enemies){
+            const a=Math.atan2(e.y-p.y,e.x-p.x);
+            const d=Math.hypot(e.x-p.x,e.y-p.y);
+            if(d<260){ e.x+=Math.cos(a)*(260-d); e.y+=Math.sin(a)*(260-d); }
+          }
+        }
+      }
+    }
+    // game over when everyone is down
+    if(alivePlayers().length===0) gameOver(false);
+
+    updateHUD();
   }
 
-  updateHUD();
+  // HOST: stream the authoritative state to all clients
+  if(net.mode==='host') broadcastState();
 }
 
 function levelClear(){
@@ -580,8 +685,11 @@ function levelClear(){
 
 function gameOver(win){
   state='over';
+  lastWin=win;
   hud.style.display='none';
   bossWrap.classList.remove('show');
+  // tell clients immediately (host)
+  if(net.mode==='host'){ net.lastSend=0; broadcastState(); }
   // save the high score
   const isRecord = score>highScore;
   if(isRecord){ highScore=score; localStorage.setItem('bk_highscore', String(highScore)); }
@@ -775,14 +883,26 @@ function render(){
     }
   }
 
-  // player (top-down soldier)
-  if(!player.dead){
-    // attack range indicator (same radius in all directions)
-    const rng=attackRange();
-    ctx.strokeStyle='rgba(245,215,122,0.15)'; ctx.lineWidth=2;
-    ctx.beginPath(); ctx.arc(player.x-cam.x, player.y-cam.y, rng, 0, Math.PI*2); ctx.stroke();
-    const blink = player.invuln>0 && Math.floor(player.invuln/6)%2===0;
-    if(!blink) drawSoldier(player.x, player.y, player.aim, player.r);
+  // players (top-down soldiers)
+  for(const p of players){
+    if(p.out){ // downed marker
+      ctx.globalAlpha=0.5; circle(p.x,p.y,p.r*0.7,'#5a2330'); ctx.globalAlpha=1;
+      continue;
+    }
+    // attack range ring only for the player this device controls
+    if(p===localPlayer){
+      const rng=attackRange();
+      ctx.strokeStyle='rgba(245,215,122,0.15)'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(p.x-cam.x, p.y-cam.y, rng, 0, Math.PI*2); ctx.stroke();
+    }
+    const blink = p.invuln>0 && Math.floor(p.invuln/6)%2===0;
+    if(!blink) drawSoldier(p);
+    // name tag for co-op teammates (not for your own soldier)
+    if(p!==localPlayer && players.length>1){
+      ctx.fillStyle=p.color; ctx.font='bold 13px Trebuchet MS'; ctx.textAlign='center';
+      ctx.fillText(p.name||'P', p.x-cam.x, p.y-cam.y-p.r-10);
+      ctx.textAlign='left';
+    }
   }
 
   ctx.restore();
@@ -962,14 +1082,14 @@ function drawWeaponIcon(type, r, color){
   ctx.restore();
 }
 
-function drawSoldier(wx, wy, ang, r){
-  const x=wx-cam.x, y=wy-cam.y;
+function drawSoldier(p){
+  const r=p.r, x=p.x-cam.x, y=p.y-cam.y;
   ctx.save();
   ctx.translate(x,y);
-  ctx.rotate(ang+Math.PI/2); // sprite drawn facing "up", rotate so it faces aim
+  ctx.rotate(p.aim+Math.PI/2); // sprite drawn facing "up", rotate so it faces aim
 
-  // subtle glow
-  ctx.globalAlpha=0.18; ctx.fillStyle='#f5d77a';
+  // subtle glow (tinted with the player's colour for co-op)
+  ctx.globalAlpha=0.18; ctx.fillStyle=p.color||'#f5d77a';
   ctx.beginPath(); ctx.arc(0,0,r+9,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
 
   // body / tactical vest (rounded torso)
@@ -1011,12 +1131,12 @@ function drawSoldier(wx, wy, ang, r){
   ctx.fillStyle='#15151a';
   ctx.fillRect(-r*0.04, -r*1.55, r*0.08, r*0.22);
   // muzzle tip (accent colored by current weapon)
-  ctx.fillStyle=WEAPONS[player.weapon].color;
+  ctx.fillStyle=WEAPONS[p.weapon].color;
   ctx.fillRect(-r*0.10, -r*2.12, r*0.20, r*0.16);
 
   // muzzle flash when firing
-  if(player.flash>0){
-    ctx.globalAlpha=player.flash/5;
+  if(p.flash>0){
+    ctx.globalAlpha=p.flash/5;
     ctx.fillStyle='#fff1b0';
     ctx.beginPath();
     ctx.moveTo(0,-r*2.5);
@@ -1072,30 +1192,238 @@ function drawControls(){
 
 function loop(){ update(); render(); requestAnimationFrame(loop); }
 
-// ---- Controls ----
+// ---- Lobby DOM ----
+const lobbyScreen=document.getElementById('lobbyScreen');
+const lobbyChoice=document.getElementById('lobbyChoice'), lobbyJoin=document.getElementById('lobbyJoin'), lobbyRoom=document.getElementById('lobbyRoom');
+const playerList=document.getElementById('playerList'), lobbyStatus=document.getElementById('lobbyStatus');
+const roomCodeLine=document.getElementById('roomCodeLine'), shareWrap=document.getElementById('shareWrap'), shareLink=document.getElementById('shareLink');
+const startCoopBtn=document.getElementById('startCoopBtn'), codeInput=document.getElementById('codeInput');
+
+// ---- Single player ----
 function startGame(){
-  startScreen.classList.add('hidden');
-  overScreen.classList.add('hidden');
-  hud.style.display='flex';
-  endmsg.style.fontSize='';
-  score=0; addScore(0); // reset score display
-  initPlayer(); buildWorld(); startLevel(0); state='play';
+  netTeardown();
+  startScreen.classList.add('hidden'); overScreen.classList.add('hidden'); lobbyScreen.classList.add('hidden');
+  hud.style.display='flex'; endmsg.style.fontSize='';
+  score=0; addScore(0);
+  resetLocalPlayer(); buildWorld(); startLevel(0); state='play';
 }
 function goToMenu(){
-  overScreen.classList.add('hidden');
-  hud.style.display='none';
-  bossWrap.classList.remove('show');
-  startScreen.classList.remove('hidden');
-  state='menu';
+  overScreen.classList.add('hidden'); lobbyScreen.classList.add('hidden');
+  hud.style.display='none'; bossWrap.classList.remove('show');
+  startScreen.classList.remove('hidden'); state='menu';
 }
+function quitToMenu(){ netTeardown(); goToMenu(); }
+function onRetry(){
+  if(net.mode==='host') coopRestart();
+  else if(net.mode==='client') {/* only the host can restart */}
+  else startGame();
+}
+function coopRestart(){
+  overScreen.classList.add('hidden'); hud.style.display='flex';
+  score=0; addScore(0);
+  for(const p of players){ p.out=false; p.dead=false; p.lives=3; p.hp=p.maxHp; p.weapon='pistol'; }
+  buildWorld(); sendWorldToAll(); startLevel(0); state='play';
+}
+
+// ---- Lobby navigation ----
+function showLobbyView(which){
+  for(const v of [lobbyChoice,lobbyJoin,lobbyRoom]) v.classList.add('hidden');
+  which.classList.remove('hidden');
+}
+function openLobby(){
+  startScreen.classList.add('hidden'); overScreen.classList.add('hidden');
+  hud.style.display='none'; bossWrap.classList.remove('show');
+  lobbyScreen.classList.remove('hidden'); showLobbyView(lobbyChoice); state='menu';
+}
+function closeLobby(){ lobbyScreen.classList.add('hidden'); }
+function genCode(){ const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<4;i++) s+=c[Math.floor(Math.random()*c.length)]; return s; }
+function ensurePeer(){
+  if(typeof Peer==='undefined'){ lobbyStatus.textContent='Network library not loaded — you need an internet connection for online mode.'; return false; }
+  return true;
+}
+function updatePlayerList(){
+  const names=players.map(p=>(p.isLocal?'➤ ':'• ')+(p.name||'P')+(p.isLocal?' (you)':''));
+  playerList.innerHTML=names.join('<br>')||'—';
+}
+
+// ---- HOST ----
+function hostCreateRoom(){
+  if(!ensurePeer()) return;
+  netTeardown();
+  net.mode='host'; net.conns=[]; net.roomId=genCode(); net.myId='host-'+net.roomId;
+  resetLocalPlayer(); player.name='HOST'; buildWorld();
+  showLobbyView(lobbyRoom);
+  roomCodeLine.innerHTML='ROOM CODE: <b style="color:#9dff5a;letter-spacing:4px">'+net.roomId+'</b>';
+  shareWrap.style.display='block';
+  shareLink.value=location.origin+location.pathname+'?room='+net.roomId;
+  startCoopBtn.classList.remove('hidden');
+  lobbyStatus.textContent='Creating room…';
+  updatePlayerList();
+  net.peer=new Peer('bka-'+net.roomId, PEER_CONFIG);
+  net.peer.on('open', ()=>{ lobbyStatus.textContent='Room ready! Share the link, then press START.'; });
+  net.peer.on('error', e=>{ lobbyStatus.textContent='Network error: '+(e.type||e)+'. Try creating again.'; });
+  net.peer.on('connection', conn=>{
+    conn.on('open', ()=>{
+      net.conns.push(conn);
+      const rp=makePlayer(conn.peer, false, net.conns.length, 'P'+(net.conns.length+1));
+      conn.gp=rp; players.push(rp);
+      try{ conn.send({t:'world', decor, started: state==='play'}); }catch(e){}
+      updatePlayerList();
+      lobbyStatus.textContent=net.conns.length+' friend(s) connected.';
+    });
+    conn.on('data', d=>{ if(d&&d.t==='input'&&conn.gp){ conn.gp.input.mx=d.mx; conn.gp.input.my=d.my; conn.gp.input.atk=!!d.atk; } });
+    conn.on('close', ()=>hostDropConn(conn));
+    conn.on('error', ()=>hostDropConn(conn));
+  });
+}
+function hostDropConn(conn){
+  net.conns=net.conns.filter(c=>c!==conn);
+  if(conn.gp) players=players.filter(p=>p!==conn.gp);
+  updatePlayerList();
+  if(net.mode==='host' && lobbyStatus) lobbyStatus.textContent=net.conns.length+' friend(s) connected.';
+}
+function hostStartCoop(){
+  if(state==='play') return;
+  closeLobby(); hud.style.display='flex';
+  score=0; addScore(0);
+  startCoopBtn.classList.add('hidden');
+  startLevel(0); state='play';
+}
+function sendWorldToAll(){ for(const c of net.conns){ try{ c.send({t:'world', decor, started:true}); }catch(e){} } }
+
+// ---- CLIENT ----
+function clientJoin(code){
+  if(!ensurePeer()) return;
+  netTeardown();
+  net.mode='client'; net.roomId=code;
+  showLobbyView(lobbyRoom);
+  roomCodeLine.innerHTML='ROOM: <b style="color:#9dff5a;letter-spacing:4px">'+code+'</b>';
+  shareWrap.style.display='none'; startCoopBtn.classList.add('hidden');
+  lobbyStatus.textContent='Connecting to host…'; playerList.textContent='';
+  net.peer=new Peer(PEER_CONFIG);
+  net.peer.on('open', id=>{
+    net.myId=id;
+    const conn=net.peer.connect('bka-'+code, {reliable:true});
+    net.conns=[conn];
+    conn.on('open', ()=>{ lobbyStatus.textContent='Connected! Waiting for the host to start…'; });
+    conn.on('data', d=>clientHandle(d));
+    conn.on('close', ()=>{ lobbyStatus.textContent='Disconnected from host.'; });
+    conn.on('error', ()=>{ lobbyStatus.textContent='Connection error.'; });
+  });
+  net.peer.on('error', e=>{ lobbyStatus.textContent='Could not connect ('+(e.type||e)+'). Check the code & internet.'; });
+}
+function clientHandle(d){
+  if(!d) return;
+  if(d.t==='world'){ if(d.decor) decor=d.decor; }
+  else if(d.t==='state'){
+    net.snapshot=d;
+    if(!lobbyScreen.classList.contains('hidden') && d.st==='play'){ closeLobby(); hud.style.display='flex'; }
+  }
+}
+
+// ---- Snapshot: build (host) / apply (client) ----
+function broadcastState(force){
+  if(net.mode!=='host'||!net.conns.length) return;
+  const now=performance.now();
+  if(!force && now-net.lastSend<55) return;
+  net.lastSend=now;
+  const s=buildSnapshot();
+  for(const c of net.conns){ if(c.open){ try{ c.send(s); }catch(e){} } }
+}
+function buildSnapshot(){
+  return { t:'state', st:state, lvl:level||0,
+    lname:(LEVELS[level]&&LEVELS[level].name)||'',
+    score, bossSpawned:!!bossSpawned, ov:(state==='over'?{win:lastWin}:null),
+    bn:boss?boss.name:'', bhp:boss?boss.hp:0, bmax:boss?boss.maxHp:0,
+    ec:enemies.filter(e=>!e.boss).length,
+    ps:players.map(p=>({id:p.id,n:p.name,c:p.color,x:Math.round(p.x),y:Math.round(p.y),a:+p.aim.toFixed(2),hp:Math.round(p.hp),mh:p.maxHp,lv:p.lives,w:p.weapon,fl:p.flash,iv:p.invuln>0?1:0,o:p.out?1:0})),
+    es:enemies.map(e=>({x:Math.round(e.x),y:Math.round(e.y),r:e.r,b:e.boss?1:0,c:e.color||'',hp:e.hp,mh:e.maxHp})),
+    bs:bullets.map(b=>({x:Math.round(b.x),y:Math.round(b.y),c:b.color})),
+    eb:eBullets.map(b=>({x:Math.round(b.x),y:Math.round(b.y),c:b.color})),
+    pk:pickups.map(p=>({x:Math.round(p.x),y:Math.round(p.y),k:p.kind,w:p.weapon}))
+  };
+}
+function applySnapshot(s){
+  level=s.lvl; score=s.score; bossSpawned=s.bossSpawned;
+  enemies=s.es.map(e=>({x:e.x,y:e.y,r:e.r,boss:!!e.b,color:e.c,hp:e.hp,maxHp:e.mh}));
+  bullets=s.bs.map(b=>({x:b.x,y:b.y,r:5,color:b.c}));
+  eBullets=s.eb.map(b=>({x:b.x,y:b.y,r:5,color:b.c}));
+  pickups=s.pk.map(p=>({x:p.x,y:p.y,r:16,kind:p.k,weapon:p.w,bob:0}));
+  players=s.ps.map(p=>({id:p.id,name:p.n,color:p.c,x:p.x,y:p.y,aim:p.a,hp:p.hp,maxHp:p.mh,lives:p.lv,weapon:p.w,flash:p.fl,invuln:p.iv?6:0,out:!!p.o,r:16,isLocal:p.id===net.myId}));
+  localPlayer=players.find(p=>p.isLocal)||localPlayer;
+  if(localPlayer){
+    player=localPlayer;
+    hpfill.style.width=Math.max(0,localPlayer.hp/localPlayer.maxHp*100)+'%';
+    livesText.textContent='♥ '.repeat(Math.max(0,localPlayer.lives)).trim()||'—';
+    if(weaponText) weaponText.textContent=WEAPONS[localPlayer.weapon].name;
+  }
+  lvlText.textContent=s.lname; if(scoreText) scoreText.textContent='SCORE '+s.score;
+  enemyText.textContent=s.bossSpawned?'BOSS!':'Enemies: '+s.ec;
+  if(s.bossSpawned && s.bmax){ bossWrap.classList.add('show'); bossNameEl.textContent=s.bn; bossfill.style.width=Math.max(0,s.bhp/s.bmax*100)+'%'; }
+  else bossWrap.classList.remove('show');
+  if(s.st==='over' && state!=='over') showClientGameOver(s.ov);
+  if(s.st==='play' && !overScreen.classList.contains('hidden')){ overScreen.classList.add('hidden'); hud.style.display='flex'; }
+  state=s.st;
+}
+function showClientGameOver(ov){
+  hud.style.display='none'; bossWrap.classList.remove('show');
+  const win=ov&&ov.win;
+  endmsg.textContent=win?'VICTORY!':'YOU DIED';
+  endmsg.style.fontSize=win?'clamp(34px,10vw,72px)':'';
+  overSub.innerHTML=(win?'Your squad conquered the wasteland':'Your squad has fallen')+
+    '<div style="margin-top:14px;font-size:clamp(20px,6vw,30px);color:#f5d77a;font-weight:900">SCORE: '+score+'</div>'+
+    '<div style="margin-top:4px;font-size:13px;color:#caa3ff">Waiting for the host…</div>';
+  retryBtn.textContent='HOST RESTARTS';
+  overScreen.classList.remove('hidden');
+}
+function sendInput(){
+  const c=net.conns[0]; if(!c||!c.open) return;
+  const now=performance.now(); if(now-net.lastInput<50) return; net.lastInput=now;
+  const inp=readLocalInput();
+  try{ c.send({t:'input',mx:inp.mx,my:inp.my,atk:inp.atk}); }catch(e){}
+}
+function clientUpdate(){
+  sendInput();
+  if(net.snapshot) applySnapshot(net.snapshot);
+  if(localPlayer){
+    cam.x=localPlayer.x-VW/2; cam.y=localPlayer.y-VH/2;
+    cam.x=Math.max(0,Math.min(MAP_W-VW,cam.x)); cam.y=Math.max(0,Math.min(MAP_H-VH,cam.y));
+    if(MAP_W<VW) cam.x=(MAP_W-VW)/2; if(MAP_H<VH) cam.y=(MAP_H-VH)/2;
+  }
+}
+function netTeardown(){
+  try{ for(const c of net.conns){ try{c.close();}catch(e){} } }catch(e){}
+  try{ if(net.peer) net.peer.destroy(); }catch(e){}
+  net.peer=null; net.conns=[]; net.mode='off'; net.snapshot=null; net.roomId=null; net.myId=null;
+}
+
+// ---- Button wiring ----
 document.getElementById('startBtn').onclick=startGame;
-retryBtn.onclick=startGame;
-quitBtn.onclick=goToMenu;
+document.getElementById('onlineBtn').onclick=openLobby;
+document.getElementById('createRoomBtn').onclick=hostCreateRoom;
+document.getElementById('joinRoomBtn').onclick=()=>{ showLobbyView(lobbyJoin); setTimeout(()=>codeInput.focus(),60); };
+document.getElementById('lobbyBackBtn').onclick=()=>{ netTeardown(); goToMenu(); };
+document.getElementById('joinBackBtn').onclick=()=>showLobbyView(lobbyChoice);
+document.getElementById('connectBtn').onclick=()=>{ const code=(codeInput.value||'').trim().toUpperCase(); if(code.length>=3) clientJoin(code); else lobbyStatus.textContent='Enter the 4-letter room code.'; };
+codeInput.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); document.getElementById('connectBtn').click(); } });
+document.getElementById('startCoopBtn').onclick=hostStartCoop;
+document.getElementById('leaveRoomBtn').onclick=()=>{ netTeardown(); goToMenu(); };
+document.getElementById('copyLinkBtn').onclick=()=>{ shareLink.select(); try{ navigator.clipboard.writeText(shareLink.value); }catch(e){ try{document.execCommand('copy');}catch(_){} } document.getElementById('copyLinkBtn').textContent='COPIED!'; setTimeout(()=>document.getElementById('copyLinkBtn').textContent='COPY LINK',1500); };
+retryBtn.onclick=onRetry;
+quitBtn.onclick=quitToMenu;
 
 state='menu';
 updateMenuHiscore();
 initPlayer();
 loop();
+
+// ---- Auto-join when opened from a shared link (?room=CODE) ----
+(function(){
+  try{
+    const code=new URLSearchParams(location.search).get('room');
+    if(code){ const cc=code.toUpperCase(); openLobby(); codeInput.value=cc; clientJoin(cc); }
+  }catch(e){}
+})();
 
 // ---- PWA: register service worker for offline play ----
 if('serviceWorker' in navigator){
