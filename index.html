@@ -242,8 +242,11 @@ const WEAPONS={
   rifle:   {name:"RIFLE",    fireRate:9,  dmg:1, pellets:1, spread:0,    speed:11, color:'#f5d77a'},
   shotgun: {name:"SHOTGUN",  fireRate:30, dmg:1, pellets:5, spread:0.5,  speed:8,  color:'#ff9d4d'},
   smg:     {name:"SMG",      fireRate:5,  dmg:1, pellets:1, spread:0.12, speed:10, color:'#5ad1ff'},
+  // ---- Rare golden weapon: appears once per game on a random round ----
+  scar:    {name:"GOLDEN SCAR", fireRate:6, dmg:3, pellets:1, spread:0.05, speed:13, color:'#ffd24d',
+            bulletR:9, bulletLife:95, pierce:4, special:'gold', gunScale:1.4},
 };
-const WEAPON_KEYS=['rifle','shotgun','smg'];
+const WEAPON_KEYS=['rifle','shotgun','smg']; // random field weapons (SCAR excluded — it's special)
 
 let level, boss, bossSpawned, state;
 let enemies=[], bullets=[], eBullets=[], particles=[], pickups=[];
@@ -278,6 +281,9 @@ const PEER_CONFIG={ debug:1, config:{ iceServers:[
   {urls:'turn:openrelay.metered.ca:443?transport=tcp', username:'openrelayproject', credential:'openrelayproject'}
 ]}};
 function alivePlayers(){ return players.filter(p=>!p.out); }
+
+// ---- Golden SCAR: one random round per game gets the special weapon ----
+let scarRound=-1;
 
 // ---- Score ----
 let score=0;
@@ -339,6 +345,10 @@ function startLevel(idx){
     const wk=WEAPON_KEYS[Math.floor(Math.random()*WEAPON_KEYS.length)];
     pickups.push(spawnPickup('weapon', wk));
   }
+  // the rare GOLDEN SCAR appears on exactly one (random) round of the game
+  if(idx===scarRound){
+    pickups.push(spawnPickup('weapon', 'scar'));
+  }
   // health pickups
   const hCount = 3;
   for(let i=0;i<hCount;i++){
@@ -354,7 +364,8 @@ function spawnPickup(kind, weapon){
   do{ x=120+Math.random()*(MAP_W-240); y=120+Math.random()*(MAP_H-240);
       d=Math.hypot(x-MAP_W/2,y-MAP_H/2);
   }while(d<260);
-  return {x,y,r:16,kind,weapon,bob:Math.random()*Math.PI*2};
+  const r = (weapon==='scar') ? 24 : 16; // the golden SCAR crate is bigger so it stands out
+  return {x,y,r,kind,weapon,bob:Math.random()*Math.PI*2};
 }
 
 function spawnBoss(){
@@ -541,7 +552,9 @@ function update(){
           for(let k=0;k<w.pellets;k++){
             const off = w.pellets>1 ? (k-(w.pellets-1)/2)*(w.spread/Math.max(1,w.pellets-1)) : 0;
             const a = base + off + (Math.random()-0.5)*(w.spread*0.15);
-            bullets.push({x:p.x,y:p.y,vx:Math.cos(a)*w.speed,vy:Math.sin(a)*w.speed,r:5,dmg:w.dmg,life:80,color:w.color});
+            bullets.push({x:p.x,y:p.y,vx:Math.cos(a)*w.speed,vy:Math.sin(a)*w.speed,
+              r:w.bulletR||5, dmg:w.dmg, life:w.bulletLife||80, color:w.color,
+              pierce:w.pierce, special:w.special, hitList:w.pierce?[]:null});
           }
           p.fireCD=w.fireRate; p.flash=5;
         }
@@ -566,11 +579,21 @@ function update(){
     // ---- Player bullets ----
     for(let i=bullets.length-1;i>=0;i--){
       const b=bullets[i]; b.x+=b.vx; b.y+=b.vy; b.life--;
-      let hit=false;
+      let remove=false;
       for(const e of enemies){
-        if(Math.hypot(e.x-b.x,e.y-b.y)<e.r+b.r){ e.hp-=b.dmg; spawnParticles(b.x,b.y,'#f5d77a',6); hit=true; break; }
+        if(Math.hypot(e.x-b.x,e.y-b.y)<e.r+b.r){
+          if(b.pierce){
+            // piercing bullet (SCAR): damages each enemy once, passes through up to b.pierce of them
+            if(b.hitList.indexOf(e)>=0) continue;
+            b.hitList.push(e);
+            e.hp-=b.dmg; spawnParticles(b.x,b.y, b.color||'#ffd24d', 9);
+            if(b.hitList.length>b.pierce){ remove=true; break; }
+          } else {
+            e.hp-=b.dmg; spawnParticles(b.x,b.y,'#f5d77a',6); remove=true; break;
+          }
+        }
       }
-      if(hit||b.life<=0||b.x<0||b.y<0||b.x>MAP_W||b.y>MAP_H) bullets.splice(i,1);
+      if(remove||b.life<=0||b.x<0||b.y<0||b.x>MAP_W||b.y>MAP_H) bullets.splice(i,1);
     }
 
     // ---- Enemies (chase the nearest living player) ----
@@ -863,7 +886,16 @@ function render(){
     ctx.globalAlpha=0.3; circle(b.x,b.y,b.r+3,b.color||'#ff7a7a'); ctx.globalAlpha=1;
   }
   // player bullets
-  for(const b of bullets){ circle(b.x,b.y,b.r,b.color||'#f5d77a'); }
+  for(const b of bullets){
+    if(b.special==='gold'){
+      // golden SCAR rounds: glowing tracer with a bright core
+      ctx.globalAlpha=0.35; circle(b.x,b.y,b.r+6,'#ffe9a0'); ctx.globalAlpha=1;
+      circle(b.x,b.y,b.r,'#ffcf3a');
+      circle(b.x,b.y,b.r*0.5,'#fffbe0');
+    } else {
+      circle(b.x,b.y,b.r,b.color||'#f5d77a');
+    }
+  }
 
   // pickups (weapons + health)
   for(const pk of pickups){ drawPickup(pk); }
@@ -1042,13 +1074,19 @@ function drawPickup(pk){
     ctx.fillRect(-pk.r*0.62,-t/2,pk.r*1.24,t);
   } else {
     const w=WEAPONS[pk.weapon];
-    // glowing crate
+    const isScar = pk.weapon==='scar';
+    // glowing crate (extra pulsing halo for the golden SCAR)
+    if(isScar){
+      const pulse=0.25+0.2*(0.5+0.5*Math.sin(pk.bob*1.6));
+      ctx.globalAlpha=pulse; ctx.fillStyle='#ffd24d';
+      ctx.beginPath(); ctx.arc(0,0,pk.r+16,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
+    }
     ctx.globalAlpha=0.25; ctx.fillStyle=w.color;
     ctx.beginPath(); ctx.arc(0,0,pk.r+8,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
-    // crate
-    ctx.fillStyle='#2a2533';
+    // crate (golden body for the SCAR)
+    ctx.fillStyle= isScar ? '#3a3018' : '#2a2533';
     ctx.beginPath(); ctx.roundRect(-pk.r,-pk.r,pk.r*2,pk.r*2,5); ctx.fill();
-    ctx.strokeStyle=w.color; ctx.lineWidth=2.5; ctx.stroke();
+    ctx.strokeStyle=w.color; ctx.lineWidth= isScar?3.5:2.5; ctx.stroke();
     // little weapon icon
     drawWeaponIcon(pk.weapon, pk.r, w.color);
   }
@@ -1074,6 +1112,14 @@ function drawWeaponIcon(type, r, color){
     ctx.fillStyle=color; ctx.fillRect(6,-3,4,6);
     ctx.fillStyle='#9a9aa8'; ctx.fillRect(-3,2,4,8); // long mag
     ctx.fillRect(-9,1,3,4);
+  } else if(type==='scar'){
+    // GOLDEN SCAR — a big all-gold assault rifle
+    ctx.fillStyle='#ffd24d';
+    ctx.fillRect(-13,-2.5,25,6);          // long barrel/receiver
+    ctx.fillStyle='#fff0b0'; ctx.fillRect(7,-3.5,7,8);  // bright muzzle
+    ctx.fillStyle='#c79a2c'; ctx.fillRect(-8,2.5,7,8);  // curved mag
+    ctx.fillStyle='#ffd24d'; ctx.fillRect(-14,0.5,6,7); // stock
+    ctx.fillStyle='#fff6cf'; ctx.fillRect(-5,-1.5,12,2); // top rail highlight
   } else { // pistol
     ctx.fillRect(-6,-2,12,4);
     ctx.fillStyle=color; ctx.fillRect(4,-3,4,5);
@@ -1111,24 +1157,32 @@ function drawSoldier(p){
   // ===== Assault rifle (points up = forward), held on the right side =====
   ctx.save();
   ctx.translate(r*0.34, 0); // shift rifle to the right of the body
+  const gunScale = WEAPONS[p.weapon].gunScale || 1;
+  if(gunScale!==1) ctx.scale(gunScale, gunScale); // the golden SCAR is a bigger gun
+  const goldGun = p.weapon==='scar';
+  const cStock  = goldGun ? '#9a7322' : '#23201a';
+  const cBody   = goldGun ? '#caa12f' : '#2a2a33';
+  const cMag    = goldGun ? '#8a6a1c' : '#1a1a20';
+  const cBarrel = goldGun ? '#e0b53a' : '#1c1c22';
+  const cGuard  = goldGun ? '#ffd24d' : '#33333d';
 
   // stock (butt, behind the grip)
-  ctx.fillStyle='#23201a';
+  ctx.fillStyle=cStock;
   ctx.fillRect(-r*0.18, r*0.45, r*0.36, r*0.6);
   // lower receiver / grip area
-  ctx.fillStyle='#2a2a33';
+  ctx.fillStyle=cBody;
   ctx.fillRect(-r*0.22, -r*0.15, r*0.44, r*0.7);
   // magazine (curved, juts down-forward)
-  ctx.fillStyle='#1a1a20';
+  ctx.fillStyle=cMag;
   ctx.fillRect(-r*0.10, r*0.05, r*0.22, r*0.55);
   // main body / barrel (long, forward)
-  ctx.fillStyle='#1c1c22';
+  ctx.fillStyle=cBarrel;
   ctx.fillRect(-r*0.16, -r*2.05, r*0.32, r*2.0);
   // handguard highlight
-  ctx.fillStyle='#33333d';
+  ctx.fillStyle=cGuard;
   ctx.fillRect(-r*0.16, -r*1.4, r*0.32, r*0.55);
   // front sight
-  ctx.fillStyle='#15151a';
+  ctx.fillStyle= goldGun ? '#6a5214' : '#15151a';
   ctx.fillRect(-r*0.04, -r*1.55, r*0.08, r*0.22);
   // muzzle tip (accent colored by current weapon)
   ctx.fillStyle=WEAPONS[p.weapon].color;
@@ -1190,7 +1244,25 @@ function drawControls(){
   ctx.textBaseline='alphabetic';
 }
 
-function loop(){ update(); render(); requestAnimationFrame(loop); }
+// Render via requestAnimationFrame when the tab is visible.
+function loop(){
+  if(!document.hidden){ update(); render(); }
+  requestAnimationFrame(loop);
+}
+// Keep the simulation & networking alive when the tab is in the background.
+// Browsers freeze requestAnimationFrame (and clamp normal timers) in hidden tabs,
+// which would freeze a backgrounded player or host. A Web Worker timer is NOT
+// throttled, so we use it to keep ticking update() while hidden.
+(function(){
+  let started=false;
+  try{
+    const blob=new Blob(['setInterval(function(){postMessage(0)},16);'],{type:'application/javascript'});
+    const w=new Worker(URL.createObjectURL(blob));
+    w.onmessage=function(){ if(document.hidden){ try{ update(); }catch(e){} } };
+    started=true;
+  }catch(e){}
+  if(!started){ setInterval(function(){ if(document.hidden){ try{ update(); }catch(e){} } },16); }
+})();
 
 // ---- Lobby DOM ----
 const lobbyScreen=document.getElementById('lobbyScreen');
@@ -1205,6 +1277,7 @@ function startGame(){
   startScreen.classList.add('hidden'); overScreen.classList.add('hidden'); lobbyScreen.classList.add('hidden');
   hud.style.display='flex'; endmsg.style.fontSize='';
   score=0; addScore(0);
+  scarRound=Math.floor(Math.random()*LEVELS.length); // pick the round that gets the golden SCAR
   resetLocalPlayer(); buildWorld(); startLevel(0); state='play';
 }
 function goToMenu(){
@@ -1222,6 +1295,7 @@ function coopRestart(){
   overScreen.classList.add('hidden'); hud.style.display='flex';
   score=0; addScore(0);
   for(const p of players){ p.out=false; p.dead=false; p.lives=3; p.hp=p.maxHp; p.weapon='pistol'; }
+  scarRound=Math.floor(Math.random()*LEVELS.length);
   buildWorld(); sendWorldToAll(); startLevel(0); state='play';
 }
 
@@ -1286,6 +1360,7 @@ function hostStartCoop(){
   if(state==='play') return;
   closeLobby(); hud.style.display='flex';
   score=0; addScore(0);
+  scarRound=Math.floor(Math.random()*LEVELS.length);
   startCoopBtn.classList.add('hidden');
   startLevel(0); state='play';
 }
