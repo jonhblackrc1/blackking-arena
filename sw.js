@@ -1,5 +1,5 @@
 // Blackking Arena service worker
-const CACHE = 'blackking-arena-v6';
+const CACHE = 'blackking-arena-v7';
 const ASSETS = [
   'index.html',
   'manifest.json',

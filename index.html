@@ -246,7 +246,7 @@ const WEAPONS={
   scar:    {name:"GOLDEN SCAR", fireRate:6, dmg:3, pellets:1, spread:0.05, speed:13, color:'#ffd24d',
             bulletR:9, bulletLife:95, pierce:4, special:'gold', gunScale:1.4},
 };
-const WEAPON_KEYS=['rifle','shotgun','smg']; // random field weapons (SCAR excluded — it's special)
+const WEAPON_KEYS=['rifle','shotgun','smg','scar']; // random field weapons (all equal probability)
 
 let level, boss, bossSpawned, state;
 let enemies=[], bullets=[], eBullets=[], particles=[], pickups=[];
@@ -281,9 +281,6 @@ const PEER_CONFIG={ debug:1, config:{ iceServers:[
   {urls:'turn:openrelay.metered.ca:443?transport=tcp', username:'openrelayproject', credential:'openrelayproject'}
 ]}};
 function alivePlayers(){ return players.filter(p=>!p.out); }
-
-// ---- Golden SCAR: one random round per game gets the special weapon ----
-let scarRound=-1;
 
 // ---- Score ----
 let score=0;
@@ -344,10 +341,6 @@ function startLevel(idx){
   for(let i=0;i<wCount;i++){
     const wk=WEAPON_KEYS[Math.floor(Math.random()*WEAPON_KEYS.length)];
     pickups.push(spawnPickup('weapon', wk));
-  }
-  // the rare GOLDEN SCAR appears on exactly one (random) round of the game
-  if(idx===scarRound){
-    pickups.push(spawnPickup('weapon', 'scar'));
   }
   // health pickups
   const hCount = 3;
@@ -1277,7 +1270,6 @@ function startGame(){
   startScreen.classList.add('hidden'); overScreen.classList.add('hidden'); lobbyScreen.classList.add('hidden');
   hud.style.display='flex'; endmsg.style.fontSize='';
   score=0; addScore(0);
-  scarRound=Math.floor(Math.random()*LEVELS.length); // pick the round that gets the golden SCAR
   resetLocalPlayer(); buildWorld(); startLevel(0); state='play';
 }
 function goToMenu(){
@@ -1295,7 +1287,6 @@ function coopRestart(){
   overScreen.classList.add('hidden'); hud.style.display='flex';
   score=0; addScore(0);
   for(const p of players){ p.out=false; p.dead=false; p.lives=3; p.hp=p.maxHp; p.weapon='pistol'; }
-  scarRound=Math.floor(Math.random()*LEVELS.length);
   buildWorld(); sendWorldToAll(); startLevel(0); state='play';
 }
 
@@ -1360,7 +1351,6 @@ function hostStartCoop(){
   if(state==='play') return;
   closeLobby(); hud.style.display='flex';
   score=0; addScore(0);
-  scarRound=Math.floor(Math.random()*LEVELS.length);
   startCoopBtn.classList.add('hidden');
   startLevel(0); state='play';
 }
