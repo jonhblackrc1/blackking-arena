@@ -104,7 +104,7 @@
 
 <div class="overlay" id="startScreen">
   <div class="title">BLACKKING<br>ARENA</div>
-  <div class="sub">ZOMBIE WASTELAND · 10 ZONES · 10 BOSSES</div>
+  <div class="sub">ZOMBIE WASTELAND · 20 ZONES · 20 BOSSES</div>
   <div class="sub" id="hiscoreMenu" style="margin-top:8px;color:#f5d77a;font-weight:bold">HIGH SCORE: 0</div>
   <div id="leaderboardMenu" class="board"></div>
   <div class="btnRow">
@@ -242,16 +242,27 @@ updateView();
 
 // ---- Level config ----
 const LEVELS=[
-  {name:"LEVEL 1", enemies:6,  espeed:0.9, ehp:2, eShoot:0.004, boss:{name:"XARN THE DEVOURER", hp:30, speed:1.0, fireRate:60, color:'#ff5a7a'}},
-  {name:"LEVEL 2", enemies:8,  espeed:1.0, ehp:2, eShoot:0.006, boss:{name:"QUEEN VYLAXIS",   hp:45, speed:1.1, fireRate:48, color:'#b07cff'}},
-  {name:"LEVEL 3", enemies:10, espeed:1.1, ehp:3, eShoot:0.008, boss:{name:"THE HIVE MIND",    hp:65, speed:0.9, fireRate:40, color:'#5aff8a'}},
-  {name:"LEVEL 4", enemies:12, espeed:1.25,ehp:3, eShoot:0.010, boss:{name:"VOID STALKER",  hp:90, speed:1.3, fireRate:32, color:'#5ad1ff'}},
-  {name:"LEVEL 5", enemies:14, espeed:1.4, ehp:4, eShoot:0.012, boss:{name:"BLACKKING OVERLORD",hp:130,speed:1.4, fireRate:24, color:'#ff3d6e'}},
-  {name:"LEVEL 6", enemies:16, espeed:1.5, ehp:4, eShoot:0.014, boss:{name:"NEXARI PRIME",    hp:170, speed:1.45,fireRate:22, color:'#ffae42'}},
-  {name:"LEVEL 7", enemies:18, espeed:1.6, ehp:5, eShoot:0.016, boss:{name:"CRYO WIDOW",      hp:215, speed:1.55,fireRate:20, color:'#42f5e3'}},
-  {name:"LEVEL 8", enemies:20, espeed:1.7, ehp:5, eShoot:0.018, boss:{name:"OMEGA SWARM",     hp:265, speed:1.45,fireRate:18, color:'#9d5aff'}},
-  {name:"LEVEL 9", enemies:22, espeed:1.85,ehp:6, eShoot:0.020, boss:{name:"TITAN MAW",       hp:330, speed:1.6, fireRate:16, color:'#ff5ad1'}},
-  {name:"LEVEL 10",enemies:24, espeed:2.0, ehp:7, eShoot:0.024, boss:{name:"BLACKKING ASCENDANT",hp:430,speed:1.7, fireRate:13, color:'#ff2d4d'}},
+  {name:"LEVEL 1", enemies:6,  espeed:0.9, ehp:2, eShoot:0.004, boss:{name:"XARN THE DEVOURER", hp:30, speed:1.0, fireRate:60, color:'#ff5a7a', skin:'tentacle'}},
+  {name:"LEVEL 2", enemies:8,  espeed:1.0, ehp:2, eShoot:0.006, boss:{name:"QUEEN VYLAXIS",   hp:45, speed:1.1, fireRate:48, color:'#b07cff', skin:'insectoid'}},
+  {name:"LEVEL 3", enemies:10, espeed:1.1, ehp:3, eShoot:0.008, boss:{name:"THE HIVE MIND",    hp:65, speed:0.9, fireRate:40, color:'#5aff8a', skin:'swarm'}},
+  {name:"LEVEL 4", enemies:12, espeed:1.25,ehp:3, eShoot:0.010, boss:{name:"VOID STALKER",  hp:90, speed:1.3, fireRate:32, color:'#5ad1ff', skin:'demon'}},
+  {name:"LEVEL 5", enemies:14, espeed:1.4, ehp:4, eShoot:0.012, boss:{name:"BLACKKING OVERLORD",hp:130,speed:1.4, fireRate:24, color:'#ff3d6e', skin:'skull'}},
+  {name:"LEVEL 6", enemies:16, espeed:1.5, ehp:4, eShoot:0.014, boss:{name:"NEXARI PRIME",    hp:170, speed:1.45,fireRate:22, color:'#ffae42', skin:'mech'}},
+  {name:"LEVEL 7", enemies:18, espeed:1.6, ehp:5, eShoot:0.016, boss:{name:"CRYO WIDOW",      hp:215, speed:1.55,fireRate:20, color:'#42f5e3', skin:'crystal'}},
+  {name:"LEVEL 8", enemies:20, espeed:1.7, ehp:5, eShoot:0.018, boss:{name:"OMEGA SWARM",     hp:265, speed:1.45,fireRate:18, color:'#9d5aff', skin:'cyclops'}},
+  {name:"LEVEL 9", enemies:22, espeed:1.85,ehp:6, eShoot:0.020, boss:{name:"TITAN MAW",       hp:330, speed:1.6, fireRate:16, color:'#ff5ad1', skin:'slimeking'}},
+  {name:"LEVEL 10",enemies:24, espeed:2.0, ehp:7, eShoot:0.024, boss:{name:"BLACKKING ASCENDANT",hp:430,speed:1.7, fireRate:13, color:'#ff2d4d', skin:'hydra'}},
+  // ---- Levels 11-20: difficulty climbs at HALF the previous step (gentler back half) ----
+  {name:"LEVEL 11",enemies:25, espeed:2.06,ehp:7, eShoot:0.025, boss:{name:"ROT SOVEREIGN",     hp:480, speed:1.72,fireRate:13, color:'#7aff5a', skin:'tentacle'}},
+  {name:"LEVEL 12",enemies:26, espeed:2.12,ehp:8, eShoot:0.026, boss:{name:"SKARN BROODMOTHER",  hp:530, speed:1.73,fireRate:12, color:'#c0ff42', skin:'insectoid'}},
+  {name:"LEVEL 13",enemies:27, espeed:2.18,ehp:8, eShoot:0.027, boss:{name:"THE THOUSAND EYES",  hp:580, speed:1.74,fireRate:12, color:'#42c8ff', skin:'swarm'}},
+  {name:"LEVEL 14",enemies:28, espeed:2.24,ehp:9, eShoot:0.028, boss:{name:"INFERNAL WARLORD",   hp:640, speed:1.75,fireRate:11, color:'#ff7a2d', skin:'demon'}},
+  {name:"LEVEL 15",enemies:29, espeed:2.30,ehp:9, eShoot:0.029, boss:{name:"BONELORD MORDIS",    hp:700, speed:1.76,fireRate:11, color:'#e8e0d0', skin:'skull'}},
+  {name:"LEVEL 16",enemies:30, espeed:2.36,ehp:10,eShoot:0.030, boss:{name:"OMEGA SENTINEL",     hp:770, speed:1.77,fireRate:11, color:'#9db4ff', skin:'mech'}},
+  {name:"LEVEL 17",enemies:31, espeed:2.42,ehp:10,eShoot:0.031, boss:{name:"GLACIUS TYRANT",     hp:840, speed:1.78,fireRate:10, color:'#5ad1ff', skin:'crystal'}},
+  {name:"LEVEL 18",enemies:32, espeed:2.48,ehp:11,eShoot:0.032, boss:{name:"THE WATCHER",        hp:920, speed:1.79,fireRate:10, color:'#ff5a9d', skin:'cyclops'}},
+  {name:"LEVEL 19",enemies:33, espeed:2.54,ehp:11,eShoot:0.033, boss:{name:"NINEFANG HYDRA",     hp:1010,speed:1.80,fireRate:10, color:'#5affd1', skin:'hydra'}},
+  {name:"LEVEL 20",enemies:34, espeed:2.60,ehp:12,eShoot:0.034, boss:{name:"LA PARKA",           hp:1300,speed:1.82,fireRate:9,  color:'#101015', skin:'reaper'}},
 ];
 
 // ---- Weapon types (picked up on the field) ----
@@ -438,7 +449,7 @@ function spawnBoss(){
   const b=LEVELS[level].boss;
   const ref=alivePlayers()[0]||{x:MAP_W/2,y:MAP_H/2};
   boss={x:ref.x, y:ref.y-450, r:42, hp:b.hp, maxHp:b.hp, speed:b.speed,
-        fireRate:b.fireRate, fireCD:60, color:b.color, name:b.name, boss:true, pattern:0};
+        fireRate:b.fireRate, fireCD:60, color:b.color, name:b.name, skin:b.skin||'tentacle', boss:true, pattern:0};
   if(boss.y<60) boss.y=60;
   enemies.push(boss);
   bossSpawned=true;
@@ -1063,60 +1074,240 @@ function drawAlien(e){
   ctx.restore();
 }
 
+// ---- Boss skins: each boss has a distinct look (dispatched by e.skin) ----
 function drawAlienBoss(e){
-  const x=e.x-cam.x, y=e.y-cam.y, r=e.r;
-  const wob=Math.sin(e.wob)*4;
-  const col=e.color;
+  const x=e.x-cam.x, y=e.y-cam.y, r=e.r, col=e.color;
   ctx.save();
   ctx.translate(x,y);
-
-  // pulsing aura
-  ctx.globalAlpha=0.22; ctx.fillStyle=col;
+  // shared pulsing aura
+  ctx.globalAlpha=0.22; ctx.fillStyle = e.skin==='reaper' ? '#000000' : col;
   ctx.beginPath(); ctx.arc(0,0,r+18+Math.sin(e.wob)*4,0,Math.PI*2); ctx.fill();
   ctx.globalAlpha=1;
-
-  // writhing tentacles
+  switch(e.skin){
+    case 'insectoid': bossInsectoid(e,r,col); break;
+    case 'swarm':     bossSwarm(e,r,col); break;
+    case 'demon':     bossDemon(e,r,col); break;
+    case 'skull':     bossSkull(e,r,col); break;
+    case 'mech':      bossMech(e,r,col); break;
+    case 'crystal':   bossCrystal(e,r,col); break;
+    case 'cyclops':   bossCyclops(e,r,col); break;
+    case 'slimeking': bossSlime(e,r,col); break;
+    case 'hydra':     bossHydra(e,r,col); break;
+    case 'reaper':    bossReaper(e,r,col); break;
+    default:          bossTentacle(e,r,col); break;
+  }
+  ctx.restore();
+}
+function bossEyes(list, r, glow){
+  for(const o of list){
+    const ex=o[0], ey=o[1], sx=o[2]||r*0.18, sy=o[3]||r*0.22;
+    ctx.fillStyle=glow||'#caffd0';
+    ctx.beginPath(); ctx.ellipse(ex,ey,sx,sy,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#0b0d18';
+    ctx.beginPath(); ctx.arc(ex,ey,sx*0.5,0,Math.PI*2); ctx.fill();
+  }
+}
+function bossTentacle(e,r,col){
+  const wob=Math.sin(e.wob)*4;
   ctx.strokeStyle=col; ctx.lineWidth=6; ctx.lineCap='round';
   for(let i=0;i<6;i++){
     const ang=(i/6)*Math.PI*2 + Math.sin(e.wob+i)*0.15;
     const bx=Math.cos(ang)*r*0.7, by=Math.sin(ang)*r*0.7;
     const ex=Math.cos(ang)*(r*1.5+wob), ey=Math.sin(ang)*(r*1.5+wob);
     ctx.beginPath(); ctx.moveTo(bx,by);
-    ctx.quadraticCurveTo(Math.cos(ang)*r*1.1+wob, Math.sin(ang)*r*1.1, ex,ey);
-    ctx.stroke();
+    ctx.quadraticCurveTo(Math.cos(ang)*r*1.1+wob, Math.sin(ang)*r*1.1, ex,ey); ctx.stroke();
   }
-
-  // massive head/body
-  ctx.fillStyle=col;
-  ctx.beginPath(); ctx.ellipse(0,0,r*0.95,r,0,0,Math.PI*2); ctx.fill();
-  // darker carapace ridges
+  ctx.fillStyle=col; ctx.beginPath(); ctx.ellipse(0,0,r*0.95,r,0,0,Math.PI*2); ctx.fill();
   ctx.strokeStyle='rgba(0,0,0,0.3)'; ctx.lineWidth=3;
   ctx.beginPath(); ctx.ellipse(0,0,r*0.6,r*0.75,0,0,Math.PI*2); ctx.stroke();
-  // bright core
-  ctx.fillStyle='#1c1230';
-  ctx.beginPath(); ctx.arc(0,0,r*0.55,0,Math.PI*2); ctx.fill();
-
-  // three menacing eyes
-  ctx.fillStyle='#fff';
-  const eyes=[[-r*0.28,-r*0.1],[r*0.28,-r*0.1],[0,r*0.28]];
-  for(const [ex,ey] of eyes){
-    ctx.fillStyle='#caffd0';
-    ctx.beginPath(); ctx.ellipse(ex,ey,r*0.18,r*0.22,0,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='#0b0d18';
-    ctx.beginPath(); ctx.arc(ex,ey,r*0.09,0,Math.PI*2); ctx.fill();
-  }
-
-  // crown of spikes (keeps the "boss" feel)
+  ctx.fillStyle='#1c1230'; ctx.beginPath(); ctx.arc(0,0,r*0.55,0,Math.PI*2); ctx.fill();
+  bossEyes([[-r*0.28,-r*0.1],[r*0.28,-r*0.1],[0,r*0.28]], r);
   ctx.fillStyle=col;
-  for(let i=-2;i<=2;i++){
-    const sx=i*r*0.3;
-    ctx.beginPath();
-    ctx.moveTo(sx-r*0.12,-r*0.95);
-    ctx.lineTo(sx, -r*1.4);
-    ctx.lineTo(sx+r*0.12,-r*0.95);
-    ctx.closePath(); ctx.fill();
+  for(let i=-2;i<=2;i++){ const sx=i*r*0.3;
+    ctx.beginPath(); ctx.moveTo(sx-r*0.12,-r*0.95); ctx.lineTo(sx,-r*1.4); ctx.lineTo(sx+r*0.12,-r*0.95); ctx.closePath(); ctx.fill(); }
+}
+function bossInsectoid(e,r,col){
+  ctx.strokeStyle=col; ctx.lineWidth=4; ctx.lineCap='round';
+  for(let s=-1;s<=1;s+=2) for(let i=0;i<3;i++){
+    const baseY=-r*0.3+i*r*0.45;
+    ctx.beginPath(); ctx.moveTo(s*r*0.5, baseY);
+    ctx.quadraticCurveTo(s*r*1.2, baseY-r*0.1+Math.sin(e.wob+i)*4, s*r*1.5, baseY+r*0.3); ctx.stroke();
   }
-
+  ctx.fillStyle=col; ctx.beginPath(); ctx.ellipse(0,r*0.35,r*0.6,r*0.8,0,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.lineWidth=3;
+  for(let i=1;i<=3;i++){ ctx.beginPath(); ctx.ellipse(0,r*0.35,r*0.6*(1-i*0.18),r*0.8*(1-i*0.12),0,0,Math.PI*2); ctx.stroke(); }
+  ctx.fillStyle=col; ctx.beginPath(); ctx.ellipse(0,-r*0.25,r*0.55,r*0.5,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.ellipse(0,-r*0.25,r*0.3,r*0.28,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle=col; ctx.beginPath(); ctx.arc(0,-r*0.78,r*0.4,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle=col; ctx.lineWidth=5;
+  ctx.beginPath(); ctx.moveTo(-r*0.2,-r*0.98); ctx.quadraticCurveTo(-r*0.45,-r*1.25,-r*0.1,-r*1.3); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(r*0.2,-r*0.98); ctx.quadraticCurveTo(r*0.45,-r*1.25,r*0.1,-r*1.3); ctx.stroke();
+  ctx.lineWidth=2.5;
+  ctx.beginPath(); ctx.moveTo(-r*0.15,-r*1.05); ctx.lineTo(-r*0.4,-r*1.5+Math.sin(e.wob)*6); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(r*0.15,-r*1.05); ctx.lineTo(r*0.4,-r*1.5-Math.sin(e.wob)*6); ctx.stroke();
+  bossEyes([[-r*0.22,-r*0.82,r*0.13,r*0.16],[r*0.22,-r*0.82,r*0.13,r*0.16]], r, '#ff4d4d');
+}
+function bossSwarm(e,r,col){
+  ctx.fillStyle='#1c1230'; ctx.beginPath(); ctx.arc(0,0,r*0.55,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle=col; ctx.lineWidth=4; ctx.stroke();
+  bossEyes([[0,0,r*0.3,r*0.34]], r, col);
+  const N=7;
+  for(let i=0;i<N;i++){
+    const ang=e.wob*0.6 + i/N*Math.PI*2;
+    const rr=r*(1.15+0.1*Math.sin(e.wob*1.3+i));
+    const ox=Math.cos(ang)*rr, oy=Math.sin(ang)*rr;
+    ctx.globalAlpha=0.25; ctx.fillStyle=col; ctx.beginPath(); ctx.arc(ox,oy,r*0.28,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
+    ctx.fillStyle=col; ctx.beginPath(); ctx.arc(ox,oy,r*0.2,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#0b0d18'; ctx.beginPath(); ctx.arc(ox,oy,r*0.09,0,Math.PI*2); ctx.fill();
+  }
+}
+function bossDemon(e,r,col){
+  ctx.fillStyle=col;
+  ctx.beginPath(); ctx.moveTo(-r*0.5,-r*0.5); ctx.quadraticCurveTo(-r*1.1,-r*1.1,-r*0.75,-r*1.5);
+    ctx.quadraticCurveTo(-r*0.6,-r*1.0,-r*0.25,-r*0.7); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(r*0.5,-r*0.5); ctx.quadraticCurveTo(r*1.1,-r*1.1,r*0.75,-r*1.5);
+    ctx.quadraticCurveTo(r*0.6,-r*1.0,r*0.25,-r*0.7); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(0,r*1.05);
+    ctx.quadraticCurveTo(-r*1.0,r*0.5,-r*0.85,-r*0.4);
+    ctx.quadraticCurveTo(-r*0.6,-r*0.85,0,-r*0.7);
+    ctx.quadraticCurveTo(r*0.6,-r*0.85,r*0.85,-r*0.4);
+    ctx.quadraticCurveTo(r*1.0,r*0.5,0,r*1.05); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(0,0,r*0.6,r*0.7,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#fff3a0';
+  ctx.save(); ctx.translate(-r*0.3,-r*0.1); ctx.rotate(0.4); ctx.beginPath(); ctx.ellipse(0,0,r*0.22,r*0.1,0,0,Math.PI*2); ctx.fill(); ctx.restore();
+  ctx.save(); ctx.translate(r*0.3,-r*0.1); ctx.rotate(-0.4); ctx.beginPath(); ctx.ellipse(0,0,r*0.22,r*0.1,0,0,Math.PI*2); ctx.fill(); ctx.restore();
+  ctx.fillStyle='#000'; ctx.beginPath(); ctx.arc(-r*0.28,-r*0.08,r*0.05,0,Math.PI*2); ctx.arc(r*0.28,-r*0.08,r*0.05,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#0b0d18'; ctx.beginPath(); ctx.ellipse(0,r*0.45,r*0.4,r*0.22,0,0,Math.PI); ctx.fill();
+  ctx.fillStyle='#fff';
+  for(let i=-2;i<=2;i++){ const fx=i*r*0.16; ctx.beginPath(); ctx.moveTo(fx-r*0.06,r*0.4); ctx.lineTo(fx,r*0.62); ctx.lineTo(fx+r*0.06,r*0.4); ctx.closePath(); ctx.fill(); }
+}
+function bossSkull(e,r,col){
+  ctx.fillStyle='#e8e6d8'; ctx.beginPath(); ctx.arc(0,-r*0.1,r*0.85,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-r*0.5,r*0.35); ctx.quadraticCurveTo(0,r*1.1,r*0.5,r*0.35);
+    ctx.quadraticCurveTo(r*0.3,r*0.55,0,r*0.55); ctx.quadraticCurveTo(-r*0.3,r*0.55,-r*0.5,r*0.35); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='rgba(0,0,0,0.08)'; ctx.beginPath(); ctx.arc(r*0.22,0,r*0.55,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#0b0d18';
+  ctx.beginPath(); ctx.ellipse(-r*0.32,-r*0.1,r*0.24,r*0.28,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(r*0.32,-r*0.1,r*0.24,r*0.28,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle=col;
+  ctx.beginPath(); ctx.arc(-r*0.32,-r*0.08,r*0.11,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(r*0.32,-r*0.08,r*0.11,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#0b0d18'; ctx.beginPath(); ctx.moveTo(0,r*0.02); ctx.lineTo(-r*0.1,r*0.26); ctx.lineTo(r*0.1,r*0.26); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#e8e6d8'; ctx.strokeStyle='rgba(0,0,0,0.3)'; ctx.lineWidth=1.5;
+  for(let i=-2;i<=2;i++){ ctx.fillRect(i*r*0.16-r*0.06, r*0.42, r*0.12, r*0.18); ctx.strokeRect(i*r*0.16-r*0.06, r*0.42, r*0.12, r*0.18); }
+}
+function bossMech(e,r,col){
+  ctx.save(); ctx.rotate(e.wob*0.4);
+  ctx.strokeStyle=col; ctx.lineWidth=5; ctx.beginPath(); ctx.arc(0,0,r*1.05,0,Math.PI*2); ctx.stroke();
+  ctx.fillStyle=col;
+  for(let i=0;i<8;i++){ const a=i/8*Math.PI*2; ctx.beginPath(); ctx.arc(Math.cos(a)*r*1.05,Math.sin(a)*r*1.05,r*0.1,0,Math.PI*2); ctx.fill(); }
+  ctx.restore();
+  ctx.fillStyle='#3a3f4a'; ctx.beginPath();
+  for(let i=0;i<6;i++){ const a=i/6*Math.PI*2 - Math.PI/2; const px=Math.cos(a)*r*0.8, py=Math.sin(a)*r*0.8; i?ctx.lineTo(px,py):ctx.moveTo(px,py); } ctx.closePath(); ctx.fill();
+  ctx.strokeStyle=col; ctx.lineWidth=3; ctx.stroke();
+  ctx.strokeStyle='rgba(0,0,0,0.4)'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(-r*0.5,0); ctx.lineTo(r*0.5,0); ctx.moveTo(0,-r*0.5); ctx.lineTo(0,r*0.5); ctx.stroke();
+  ctx.fillStyle='#0b0d18'; ctx.beginPath(); ctx.arc(0,0,r*0.4,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle=col; ctx.globalAlpha=0.5+0.4*Math.sin(e.wob*1.5); ctx.beginPath(); ctx.arc(0,0,r*0.28,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
+  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(0,0,r*0.1,0,Math.PI*2); ctx.fill();
+}
+function bossCrystal(e,r,col){
+  ctx.save(); ctx.rotate(e.wob*0.2);
+  for(let i=0;i<6;i++){
+    const a=i/6*Math.PI*2;
+    ctx.save(); ctx.rotate(a);
+    ctx.fillStyle = i%2? col : '#cfeeff'; ctx.globalAlpha=0.9;
+    ctx.beginPath(); ctx.moveTo(0,-r*0.3); ctx.lineTo(r*0.22,-r*1.0); ctx.lineTo(0,-r*1.45); ctx.lineTo(-r*0.22,-r*1.0); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.restore();
+  }
+  ctx.globalAlpha=1; ctx.restore();
+  ctx.fillStyle=col; ctx.beginPath(); ctx.moveTo(0,-r*0.7); ctx.lineTo(r*0.6,0); ctx.lineTo(0,r*0.7); ctx.lineTo(-r*0.6,0); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,0.4)'; ctx.beginPath(); ctx.moveTo(0,-r*0.7); ctx.lineTo(r*0.6,0); ctx.lineTo(0,0); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.moveTo(0,r*0.7); ctx.lineTo(-r*0.6,0); ctx.lineTo(0,0); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(-r*0.12,-r*0.12,r*0.1,0,Math.PI*2); ctx.fill();
+}
+function bossCyclops(e,r,col){
+  ctx.fillStyle=col; ctx.beginPath(); ctx.arc(0,0,r*0.95,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle=col;
+  for(let i=0;i<12;i++){ const a=i/12*Math.PI*2; ctx.save(); ctx.rotate(a);
+    ctx.beginPath(); ctx.moveTo(-r*0.12,-r*0.9); ctx.lineTo(0,-r*1.2); ctx.lineTo(r*0.12,-r*0.9); ctx.closePath(); ctx.fill(); ctx.restore(); }
+  ctx.strokeStyle='rgba(120,0,0,0.4)'; ctx.lineWidth=2;
+  for(let i=0;i<6;i++){ const a=i/6*Math.PI*2; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(Math.cos(a)*r*0.85,Math.sin(a)*r*0.85); ctx.stroke(); }
+  ctx.fillStyle='#f5f0e8'; ctx.beginPath(); ctx.arc(0,0,r*0.62,0,Math.PI*2); ctx.fill();
+  const lx=Math.cos(e.wob*0.5)*r*0.12, ly=Math.sin(e.wob*0.5)*r*0.12;
+  ctx.fillStyle=col; ctx.beginPath(); ctx.arc(lx,ly,r*0.34,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#0b0d18'; ctx.beginPath(); ctx.arc(lx,ly,r*0.17,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,0.85)'; ctx.beginPath(); ctx.arc(lx-r*0.1,ly-r*0.1,r*0.06,0,Math.PI*2); ctx.fill();
+}
+function bossSlime(e,r,col){
+  ctx.fillStyle=col; ctx.beginPath();
+  const N=18;
+  for(let i=0;i<=N;i++){ const a=i/N*Math.PI*2; const w=1+0.08*Math.sin(a*4+e.wob*2); const rr=r*0.95*w;
+    const px=Math.cos(a)*rr, py=Math.sin(a)*rr*1.05+r*0.1; i?ctx.lineTo(px,py):ctx.moveTo(px,py); }
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,0.25)'; ctx.beginPath(); ctx.ellipse(-r*0.3,-r*0.35,r*0.3,r*0.18,-0.4,0,Math.PI*2); ctx.fill();
+  bossEyes([[-r*0.28,-r*0.05,r*0.16,r*0.2],[r*0.28,-r*0.05,r*0.16,r*0.2]], r, '#ffffff');
+  ctx.strokeStyle='rgba(0,0,0,0.4)'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(0,r*0.3,r*0.25,0.15*Math.PI,0.85*Math.PI); ctx.stroke();
+  ctx.fillStyle='#ffd24d'; ctx.strokeStyle='#b8860b'; ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.moveTo(-r*0.5,-r*0.75); ctx.lineTo(-r*0.5,-r*1.05); ctx.lineTo(-r*0.25,-r*0.85);
+  ctx.lineTo(0,-r*1.2); ctx.lineTo(r*0.25,-r*0.85); ctx.lineTo(r*0.5,-r*1.05); ctx.lineTo(r*0.5,-r*0.75);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+}
+function bossHydra(e,r,col){
+  ctx.fillStyle=col; ctx.beginPath(); ctx.ellipse(0,r*0.4,r*0.8,r*0.6,0,0,Math.PI*2); ctx.fill();
+  for(let h=-1;h<=1;h++){
+    const sway=Math.sin(e.wob*1.2+h)*0.25;
+    const baseAng=-Math.PI/2 + h*0.7 + sway;
+    const nx=Math.cos(baseAng)*r*1.1, ny=Math.sin(baseAng)*r*1.1;
+    ctx.strokeStyle=col; ctx.lineWidth=r*0.3; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(h*r*0.3, r*0.2); ctx.quadraticCurveTo(h*r*0.5, ny*0.4, nx, ny); ctx.stroke();
+    ctx.save(); ctx.translate(nx,ny); ctx.rotate(baseAng+Math.PI/2);
+    ctx.fillStyle=col; ctx.beginPath(); ctx.ellipse(0,0,r*0.28,r*0.36,0,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(0,-r*0.3,r*0.18,r*0.22,0,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#ffd23a'; ctx.beginPath(); ctx.arc(-r*0.12,-r*0.05,r*0.06,0,Math.PI*2); ctx.arc(r*0.12,-r*0.05,r*0.06,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#000'; ctx.beginPath(); ctx.arc(-r*0.12,-r*0.05,r*0.025,0,Math.PI*2); ctx.arc(r*0.12,-r*0.05,r*0.025,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+}
+function bossReaper(e,r,col){
+  ctx.save(); ctx.rotate(Math.sin(e.wob*0.8)*0.08);
+  // scythe (handle + curved blade)
+  ctx.strokeStyle='#5a4a32'; ctx.lineWidth=r*0.1; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(r*0.9,r*1.3); ctx.lineTo(r*0.55,-r*1.5); ctx.stroke();
+  ctx.fillStyle='#cfd4dc'; ctx.beginPath();
+  ctx.moveTo(r*0.55,-r*1.5); ctx.quadraticCurveTo(-r*0.5,-r*1.9,-r*0.9,-r*1.2);
+  ctx.quadraticCurveTo(-r*0.2,-r*1.45,r*0.5,-r*1.35); ctx.closePath(); ctx.fill();
+  ctx.strokeStyle='#9aa0aa'; ctx.lineWidth=2; ctx.stroke();
+  // black hooded cloak
+  ctx.fillStyle='#0a0a0d';
+  ctx.beginPath();
+  ctx.moveTo(0,-r*1.25);
+  ctx.quadraticCurveTo(-r*1.0,-r*0.9,-r*0.95,-r*0.1);
+  ctx.quadraticCurveTo(-r*1.25,r*0.9,-r*0.7,r*1.45);
+  ctx.lineTo(-r*0.45,r*1.15); ctx.lineTo(-r*0.2,r*1.5); ctx.lineTo(0,r*1.15);
+  ctx.lineTo(r*0.2,r*1.5); ctx.lineTo(r*0.45,r*1.15); ctx.lineTo(r*0.7,r*1.45);
+  ctx.quadraticCurveTo(r*1.25,r*0.9,r*0.95,-r*0.1);
+  ctx.quadraticCurveTo(r*1.0,-r*0.9,0,-r*1.25);
+  ctx.closePath(); ctx.fill();
+  ctx.strokeStyle='rgba(120,90,160,0.35)'; ctx.lineWidth=2; ctx.stroke();
+  // hood shadow
+  ctx.fillStyle='#020203'; ctx.beginPath(); ctx.ellipse(0,-r*0.5,r*0.5,r*0.6,0,0,Math.PI*2); ctx.fill();
+  // pale skull face
+  ctx.fillStyle='#d8d2c2';
+  ctx.beginPath(); ctx.arc(0,-r*0.55,r*0.34,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-r*0.18,-r*0.32); ctx.quadraticCurveTo(0,-r*0.05,r*0.18,-r*0.32); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#000';
+  ctx.beginPath(); ctx.ellipse(-r*0.13,-r*0.58,r*0.1,r*0.13,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(r*0.13,-r*0.58,r*0.1,r*0.13,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#7df0ff'; ctx.globalAlpha=0.55+0.45*Math.sin(e.wob*2);
+  ctx.beginPath(); ctx.arc(-r*0.13,-r*0.55,r*0.05,0,Math.PI*2); ctx.arc(r*0.13,-r*0.55,r*0.05,0,Math.PI*2); ctx.fill();
+  ctx.globalAlpha=1;
+  ctx.strokeStyle='#0b0d18'; ctx.lineWidth=1.2;
+  for(let i=-2;i<=2;i++){ ctx.beginPath(); ctx.moveTo(i*r*0.06,-r*0.36); ctx.lineTo(i*r*0.06,-r*0.26); ctx.stroke(); }
+  // bony hand on the snath
+  ctx.fillStyle='#d8d2c2'; ctx.beginPath(); ctx.arc(r*0.62,-r*0.2,r*0.12,0,Math.PI*2); ctx.fill();
   ctx.restore();
 }
 
@@ -1476,7 +1667,7 @@ function buildSnapshot(){
     bn:boss?boss.name:'', bhp:boss?boss.hp:0, bmax:boss?boss.maxHp:0,
     ec:enemies.filter(e=>!e.boss).length,
     ps:players.map(p=>({id:p.id,n:p.name,c:p.color,x:Math.round(p.x),y:Math.round(p.y),a:+p.aim.toFixed(2),hp:Math.round(p.hp),mh:p.maxHp,lv:p.lives,w:p.weapon,fl:p.flash,iv:p.invuln>0?1:0,o:p.out?1:0})),
-    es:enemies.map(e=>({x:Math.round(e.x),y:Math.round(e.y),r:e.r,b:e.boss?1:0,c:e.color||'',hp:e.hp,mh:e.maxHp})),
+    es:enemies.map(e=>({x:Math.round(e.x),y:Math.round(e.y),r:e.r,b:e.boss?1:0,c:e.color||'',hp:e.hp,mh:e.maxHp,sk:e.skin})),
     bs:bullets.map(b=>({x:Math.round(b.x),y:Math.round(b.y),c:b.color})),
     eb:eBullets.map(b=>({x:Math.round(b.x),y:Math.round(b.y),c:b.color})),
     pk:pickups.map(p=>({x:Math.round(p.x),y:Math.round(p.y),k:p.kind,w:p.weapon}))
@@ -1484,7 +1675,7 @@ function buildSnapshot(){
 }
 function applySnapshot(s){
   level=s.lvl; score=s.score; bossSpawned=s.bossSpawned;
-  enemies=s.es.map(e=>({x:e.x,y:e.y,r:e.r,boss:!!e.b,color:e.c,hp:e.hp,maxHp:e.mh}));
+  enemies=s.es.map(e=>({x:e.x,y:e.y,r:e.r,boss:!!e.b,color:e.c,hp:e.hp,maxHp:e.mh,skin:e.sk}));
   bullets=s.bs.map(b=>({x:b.x,y:b.y,r:5,color:b.c}));
   eBullets=s.eb.map(b=>({x:b.x,y:b.y,r:5,color:b.c}));
   pickups=s.pk.map(p=>({x:p.x,y:p.y,r:16,kind:p.k,weapon:p.w,bob:0}));
