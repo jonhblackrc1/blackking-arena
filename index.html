@@ -99,6 +99,7 @@
   <div class="info">
     <b>Joystick</b> (left): drag to move your character in any direction.<br>
     <b>⚔ Button</b> (right): hold to fire at the nearest enemy.<br>
+    <b>Keyboard</b> (PC): WASD / Arrows to move · Space to attack.<br>
     Dodge the plasma and defeat the alien boss of each level.
   </div>
 </div>
@@ -336,10 +337,25 @@ canvas.addEventListener('touchcancel',e=>{
 canvas.addEventListener('mousedown',e=>{ pressPoint('m',e.clientX,e.clientY); });
 window.addEventListener('mousemove',e=>{ movePoint('m',e.clientX,e.clientY); });
 window.addEventListener('mouseup',e=>{ releasePoint('m'); });
-// Keyboard fallback
+// ---- Keyboard controls (desktop): WASD / arrows = move, Space (or K) = attack ----
 const keys={};
-window.addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);
-window.addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
+const GAME_KEYS=['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',' ','k'];
+window.addEventListener('keydown',e=>{
+  if(e.repeat){ if(GAME_KEYS.includes(e.key.toLowerCase())) e.preventDefault(); return; }
+  const k=e.key.toLowerCase();
+  keys[k]=true;
+  // Enter / Space starts or restarts the game from the menu & game-over screens
+  if((k==='enter'||k===' ') && state!=='play'){
+    if(!startScreen.classList.contains('hidden')) startGame();
+    else if(!overScreen.classList.contains('hidden')) startGame();
+  }
+  // keep arrows/space from scrolling the page, and drop focus off any button
+  if(GAME_KEYS.includes(k)){
+    e.preventDefault();
+    if(document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  }
+});
+window.addEventListener('keyup',e=>{ keys[e.key.toLowerCase()]=false; });
 
 // ---- Helpers ----
 function spawnParticles(x,y,color,n){
