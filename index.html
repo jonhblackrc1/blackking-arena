@@ -98,6 +98,7 @@
     <div class="lvl" id="lvlText">LEVEL 1</div>
     <div id="livesText" style="font-size:15px;color:#ff7a9d;margin-top:2px">♥ ♥ ♥</div>
     <div class="hpbar"><div class="hpfill" id="hpfill" style="width:100%"></div></div>
+    <div class="hpbar" id="shieldbar" style="display:none;margin-top:3px;border-color:#3a6a8c;background:#162635"><div id="shieldfill" style="height:100%;background:linear-gradient(90deg,#5ad1ff,#9be3ff);width:0%;transition:width .15s"></div></div>
   </div>
   <div style="text-align:right">
     <div id="scoreText" style="font-size:18px;color:#f5d77a;font-weight:900">SCORE 0</div>
@@ -240,6 +241,7 @@ function resize(){
 window.addEventListener('resize', resize); resize();
 
 const hud=document.getElementById('hud'), hpfill=document.getElementById('hpfill');
+const shieldbar=document.getElementById('shieldbar'), shieldfill=document.getElementById('shieldfill');
 const lvlText=document.getElementById('lvlText'), enemyText=document.getElementById('enemyText'), livesText=document.getElementById('livesText');
 const weaponText=document.getElementById('weaponText'), toastEl=document.getElementById('toast');
 let toastTimer=null;
@@ -372,6 +374,7 @@ function makePlayer(id,isLocal,colorIdx,name){
   return {id, isLocal:!!isLocal, color:PLAYER_COLORS[(colorIdx||0)%PLAYER_COLORS.length],
     name: name||('P'+((colorIdx||0)+1)),
     x:MAP_W/2, y:MAP_H/2, r:16, hp:100, maxHp:100, speed:4.52, fireCD:0, dmg:1, /* 3.4 * 1.33 → 33% faster */
+    shield:0, maxShield:100, /* absorbs damage before health; only gained from shield vests */
     dead:false, out:false, lives:3, invuln:0, aim:-Math.PI/2, flash:0, weapon:'pistol',
     input:{mx:0,my:0,atk:false}};
 }
@@ -392,6 +395,12 @@ const PEER_CONFIG={ debug:1, config:{ iceServers:[
   {urls:'turn:openrelay.metered.ca:443?transport=tcp', username:'openrelayproject', credential:'openrelayproject'}
 ]}};
 function alivePlayers(){ return players.filter(p=>!p.out); }
+// apply damage to a player: the shield soaks it up first, then health
+function damagePlayer(p, amt){
+  if(p.out || p.invuln>0) return;
+  if(p.shield>0){ const a=Math.min(p.shield, amt); p.shield-=a; amt-=a; }
+  if(amt>0) p.hp-=amt;
+}
 
 // ---- Score ----
 let score=0;
@@ -567,6 +576,11 @@ function startLevel(idx){
   for(let i=0;i<hCount;i++){
     pickups.push(spawnPickup('health', null));
   }
+  // shield-vest pickups (grant shield, which absorbs damage before health)
+  const sCount = 2;
+  for(let i=0;i<sCount;i++){
+    pickups.push(spawnPickup('shield', null));
+  }
   lvlText.textContent=cfg.name;
   bossWrap.classList.remove('show');
   updateHUD();
@@ -595,8 +609,14 @@ function spawnBoss(){
   bossWrap.classList.add('show');
 }
 
+function setShieldBar(sh, maxSh){
+  if(!shieldbar) return;
+  if(sh>0){ shieldbar.style.display='block'; shieldfill.style.width=Math.max(0,Math.min(100,sh/maxSh*100))+'%'; }
+  else shieldbar.style.display='none';
+}
 function updateHUD(){
   hpfill.style.width=Math.max(0,player.hp/player.maxHp*100)+'%';
+  setShieldBar(player.shield||0, player.maxShield||100);
   livesText.textContent = '♥ '.repeat(Math.max(0,player.lives)).trim() || '—';
   if(weaponText) weaponText.textContent = WEAPONS[player.weapon].name;
   const remaining=enemies.filter(e=>!e.boss).length;
@@ -836,16 +856,13 @@ function update(){
         // melee rusher: charge straight at the player (contact damage only)
         e.x+=Math.cos(a)*e.speed; e.y+=Math.sin(a)*e.speed;
       } else {
-        // ranged kiter: hold at a stand-off distance and shoot — never close in
+        // ranged: only retreat when the player gets VERY close, otherwise tend to close in
         const R=attackRange();
-        const pref=R*0.7; // preferred distance to keep from the player
-        if(dist < pref-30){
-          e.x-=Math.cos(a)*e.speed; e.y-=Math.sin(a)*e.speed;        // too close → back away
-        } else if(dist > R){
-          e.x+=Math.cos(a)*e.speed; e.y+=Math.sin(a)*e.speed;        // out of range → step closer
+        const tooClose=R*0.35;
+        if(dist < tooClose){
+          e.x-=Math.cos(a)*e.speed; e.y-=Math.sin(a)*e.speed;        // very close → back off a bit
         } else {
-          e.x+=Math.cos(a+Math.PI/2)*e.speed*0.6*e.strafe;           // in range → strafe sideways
-          e.y+=Math.sin(a+Math.PI/2)*e.speed*0.6*e.strafe;
+          e.x+=Math.cos(a)*e.speed; e.y+=Math.sin(a)*e.speed;        // otherwise approach the player
         }
         e.fireCD--;
         // only attack when the player is within the SAME range the player can hit it
@@ -858,7 +875,7 @@ function update(){
       e.x=Math.max(e.r,Math.min(MAP_W-e.r,e.x));
       e.y=Math.max(e.r,Math.min(MAP_H-e.r,e.y));
       // touch damage to the targeted player (melee rushers hit harder)
-      if(tp && dist<e.r+tp.r && tp.invuln<=0){ tp.hp-= e.boss?0.5 : (e.melee?0.5:0.2); }
+      if(tp && dist<e.r+tp.r){ damagePlayer(tp, e.boss?0.5 : (e.melee?0.5:0.2)); }
       // death
       if(e.hp<=0){
         spawnParticles(e.x,e.y,e.boss?e.color:'#caa3ff',e.boss?40:14);
@@ -874,7 +891,7 @@ function update(){
       let hit=false;
       for(const p of players){
         if(p.out) continue;
-        if(Math.hypot(p.x-b.x,p.y-b.y)<p.r+b.r){ if(p.invuln<=0) p.hp-=6; spawnParticles(b.x,b.y,'#ff5a7a',8); hit=true; break; }
+        if(Math.hypot(p.x-b.x,p.y-b.y)<p.r+b.r){ damagePlayer(p, 6); spawnParticles(b.x,b.y,'#ff5a7a',8); hit=true; break; }
       }
       if(hit){ eBullets.splice(i,1); continue; }
       if(b.life<=0||b.x<0||b.y<0||b.x>MAP_W||b.y>MAP_H) eBullets.splice(i,1);
@@ -894,6 +911,7 @@ function update(){
         if(p.out) continue;
         if(Math.hypot(pk.x-p.x,pk.y-p.y) < pk.r+p.r){
           if(pk.kind==='health'){ p.hp=Math.min(p.maxHp,p.hp+40); spawnParticles(pk.x,pk.y,'#5aff8a',16); if(p.isLocal) showToast('+40 HP'); }
+          else if(pk.kind==='shield'){ p.shield=Math.min(p.maxShield,(p.shield||0)+50); spawnParticles(pk.x,pk.y,'#5ad1ff',16); if(p.isLocal) showToast('+50 SHIELD'); }
           else if(pk.kind==='weapon'){ p.weapon=pk.weapon; spawnParticles(pk.x,pk.y,WEAPONS[pk.weapon].color,16); if(p.isLocal) showToast(WEAPONS[pk.weapon].name+'!'); }
           taken=true; break;
         }
@@ -914,7 +932,7 @@ function update(){
         p.lives--;
         if(p.lives<=0){ p.out=true; p.dead=true; p.hp=0; spawnParticles(p.x,p.y,'#ff5a7a',30); if(p.isLocal) showToast('DOWNED'); }
         else {
-          p.hp=p.maxHp; p.invuln=120; spawnParticles(p.x,p.y,'#f5d77a',30);
+          p.hp=p.maxHp; p.shield=0; p.invuln=120; spawnParticles(p.x,p.y,'#f5d77a',30);
           for(const e of enemies){
             const a=Math.atan2(e.y-p.y,e.x-p.x);
             const d=Math.hypot(e.x-p.x,e.y-p.y);
@@ -1170,6 +1188,12 @@ function render(){
     }
     const blink = p.invuln>0 && Math.floor(p.invuln/6)%2===0;
     if(!blink) drawSoldier(p);
+    // shield aura (cyan bubble) when the player has shield
+    if(p.shield>0){
+      const sr=p.r+10+Math.sin((p.wobS=(p.wobS||0)+0.1))*1.5;
+      ctx.strokeStyle='rgba(120,210,255,'+(0.35+0.25*(p.shield/(p.maxShield||100)))+')'; ctx.lineWidth=2.5;
+      ctx.beginPath(); ctx.arc(p.x-cam.x, p.y-cam.y, sr, 0, Math.PI*2); ctx.stroke();
+    }
     // name tag for co-op teammates (not for your own soldier)
     if(p!==localPlayer && players.length>1){
       ctx.fillStyle=p.color; ctx.font='bold 13px Trebuchet MS'; ctx.textAlign='center';
@@ -1517,6 +1541,25 @@ function drawPickup(pk){
     const t=pk.r*0.34;
     ctx.fillRect(-t/2,-pk.r*0.55,t,pk.r*1.1);
     ctx.fillRect(-pk.r*0.62,-t/2,pk.r*1.24,t);
+  } else if(pk.kind==='shield'){
+    // glowing shield vest (cyan)
+    ctx.globalAlpha=0.28; ctx.fillStyle='#5ad1ff';
+    ctx.beginPath(); ctx.arc(0,0,pk.r+8,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
+    // shield/crest shape
+    ctx.fillStyle='#2a6ea8';
+    ctx.beginPath();
+    ctx.moveTo(0,-pk.r);
+    ctx.lineTo(pk.r*0.85,-pk.r*0.55);
+    ctx.lineTo(pk.r*0.85,pk.r*0.25);
+    ctx.quadraticCurveTo(pk.r*0.4,pk.r, 0,pk.r*1.05);
+    ctx.quadraticCurveTo(-pk.r*0.4,pk.r, -pk.r*0.85,pk.r*0.25);
+    ctx.lineTo(-pk.r*0.85,-pk.r*0.55);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='#9be3ff'; ctx.lineWidth=2; ctx.stroke();
+    // inner sheen + check mark
+    ctx.fillStyle='#7fd4ff';
+    ctx.beginPath(); ctx.moveTo(0,-pk.r*0.6); ctx.lineTo(pk.r*0.5,-pk.r*0.3); ctx.lineTo(pk.r*0.5,pk.r*0.15);
+    ctx.quadraticCurveTo(pk.r*0.25,pk.r*0.6, 0,pk.r*0.65); ctx.closePath(); ctx.fill();
   } else {
     const w=WEAPONS[pk.weapon];
     const gold = isGoldenWeapon(pk.weapon);
@@ -1861,7 +1904,7 @@ function buildSnapshot(){
     score, bossSpawned:!!bossSpawned, ov:(state==='over'?{win:lastWin}:null),
     bn:boss?boss.name:'', bhp:boss?boss.hp:0, bmax:boss?boss.maxHp:0,
     ec:enemies.filter(e=>!e.boss).length,
-    ps:players.map(p=>({id:p.id,n:p.name,c:p.color,x:Math.round(p.x),y:Math.round(p.y),a:+p.aim.toFixed(2),hp:Math.round(p.hp),mh:p.maxHp,lv:p.lives,w:p.weapon,fl:p.flash,iv:p.invuln>0?1:0,o:p.out?1:0})),
+    ps:players.map(p=>({id:p.id,n:p.name,c:p.color,x:Math.round(p.x),y:Math.round(p.y),a:+p.aim.toFixed(2),hp:Math.round(p.hp),mh:p.maxHp,sh:Math.round(p.shield||0),msh:p.maxShield||100,lv:p.lives,w:p.weapon,fl:p.flash,iv:p.invuln>0?1:0,o:p.out?1:0})),
     es:enemies.map(e=>({x:Math.round(e.x),y:Math.round(e.y),r:e.r,b:e.boss?1:0,c:e.color||'',hp:e.hp,mh:e.maxHp,sk:e.skin,m:e.melee?1:0})),
     bs:bullets.map(b=>({x:Math.round(b.x),y:Math.round(b.y),c:b.color})),
     eb:eBullets.map(b=>({x:Math.round(b.x),y:Math.round(b.y),c:b.color})),
@@ -1874,11 +1917,12 @@ function applySnapshot(s){
   bullets=s.bs.map(b=>({x:b.x,y:b.y,r:5,color:b.c}));
   eBullets=s.eb.map(b=>({x:b.x,y:b.y,r:5,color:b.c}));
   pickups=s.pk.map(p=>({x:p.x,y:p.y,r:16,kind:p.k,weapon:p.w,bob:0}));
-  players=s.ps.map(p=>({id:p.id,name:p.n,color:p.c,x:p.x,y:p.y,aim:p.a,hp:p.hp,maxHp:p.mh,lives:p.lv,weapon:p.w,flash:p.fl,invuln:p.iv?6:0,out:!!p.o,r:16,isLocal:p.id===net.myId}));
+  players=s.ps.map(p=>({id:p.id,name:p.n,color:p.c,x:p.x,y:p.y,aim:p.a,hp:p.hp,maxHp:p.mh,shield:p.sh||0,maxShield:p.msh||100,lives:p.lv,weapon:p.w,flash:p.fl,invuln:p.iv?6:0,out:!!p.o,r:16,isLocal:p.id===net.myId}));
   localPlayer=players.find(p=>p.isLocal)||localPlayer;
   if(localPlayer){
     player=localPlayer;
     hpfill.style.width=Math.max(0,localPlayer.hp/localPlayer.maxHp*100)+'%';
+    setShieldBar(localPlayer.shield||0, localPlayer.maxShield||100);
     livesText.textContent='♥ '.repeat(Math.max(0,localPlayer.lives)).trim()||'—';
     if(weaponText) weaponText.textContent=WEAPONS[localPlayer.weapon].name;
   }
