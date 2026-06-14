@@ -141,8 +141,7 @@
   <div class="sub" id="coinsMenu" style="margin-top:4px;color:#ffd24d;font-weight:bold">🪙 0 COINS</div>
   <div id="leaderboardMenu" class="board"></div>
   <div class="btnRow">
-    <button class="btn" id="startBtn">SINGLE PLAYER</button>
-    <button class="btn btn-alt" id="onlineBtn">ONLINE CO-OP</button>
+    <button class="btn" id="startBtn">PLAY</button>
   </div>
   <button class="btn btn-alt" id="charBtn" style="margin-top:14px">🦸 CHARACTER</button>
   <button class="btn btn-alt" id="armoryBtn" style="margin-top:10px">⚙ ARMORY · UPGRADES</button>
@@ -429,7 +428,7 @@ const CHARACTERS={
   soldier: {name:'SOLDIER',   emoji:'🪖', body:'#3d4a2f', vest:'#2c3622', shoulder:'#4a5938', helmet:'#4a5938', helmet2:'#3d4a2f', brim:'#2c3622', glow:'#f5d77a'},
   fire:    {name:'INFERNO',   emoji:'🔥', body:'#9a2c08', vest:'#6a1c04', shoulder:'#c24a14', helmet:'#d9531a', helmet2:'#9a2c08', brim:'#6a1c04', glow:'#ff7a1a', fire:true},
   shark:   {name:'SHARK',     emoji:'🦈', body:'#5a6b78', vest:'#3f4d57', shoulder:'#6d7e8a', helmet:'#7d8e9a', helmet2:'#5a6b78', brim:'#3f4d57', glow:'#7fd4ff', shark:true},
-  white:   {name:'WHITE OPS', emoji:'⬜', body:'#e6e8ee', vest:'#cdd0d8', shoulder:'#f2f4f8', helmet:'#f2f4f8', helmet2:'#dce0e8', brim:'#c2c5cd', glow:'#ffffff'},
+  white:   {name:'WHITE OPS', emoji:'⬜', body:'#e6e8ee', vest:'#cdd0d8', shoulder:'#f2f4f8', helmet:'#f2f4f8', helmet2:'#dce0e8', brim:'#c2c5cd', glow:'#ffffff', light:true},
 };
 const CHAR_ORDER=['soldier','fire','shark','white'];
 let selectedChar = localStorage.getItem('bk_char');
@@ -1332,8 +1331,16 @@ function render(){
 
   // enemy bullets
   for(const b of eBullets){
-    circle(b.x,b.y,b.r,b.color||'#ff7a7a');
-    ctx.globalAlpha=0.3; circle(b.x,b.y,b.r+3,b.color||'#ff7a7a'); ctx.globalAlpha=1;
+    const col=b.color||'#ff7a7a';
+    const dark = col==='#101015' || col==='#0a0a0d' || col==='#0b0d18'; // near-black plasma (e.g. La Parka)
+    circle(b.x,b.y,b.r,col);
+    if(dark){
+      // white border so black plasma is visible against the dark arena
+      ctx.strokeStyle='#ffffff'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(b.x-cam.x,b.y-cam.y,b.r,0,Math.PI*2); ctx.stroke();
+    } else {
+      ctx.globalAlpha=0.3; circle(b.x,b.y,b.r+3,col); ctx.globalAlpha=1;
+    }
   }
   // player bullets
   for(const b of bullets){
@@ -1485,7 +1492,7 @@ function drawAlienBoss(e){
   ctx.save();
   ctx.translate(x,y);
   // shared pulsing aura
-  ctx.globalAlpha=0.22; ctx.fillStyle = e.skin==='reaper' ? '#000000' : col;
+  ctx.globalAlpha=0.22; ctx.fillStyle = e.skin==='reaper' ? '#dfe6ff' : col; // light halo so the black reaper is visible
   ctx.beginPath(); ctx.arc(0,0,r+18+Math.sin(e.wob)*4,0,Math.PI*2); ctx.fill();
   ctx.globalAlpha=1;
   switch(e.skin){
@@ -1696,7 +1703,7 @@ function bossReaper(e,r,col){
   ctx.quadraticCurveTo(r*1.25,r*0.9,r*0.95,-r*0.1);
   ctx.quadraticCurveTo(r*1.0,-r*0.9,0,-r*1.25);
   ctx.closePath(); ctx.fill();
-  ctx.strokeStyle='rgba(120,90,160,0.35)'; ctx.lineWidth=2; ctx.stroke();
+  ctx.strokeStyle='#ffffff'; ctx.lineWidth=3; ctx.stroke(); // white outline so the black cloak stands out
   // hood shadow
   ctx.fillStyle='#020203'; ctx.beginPath(); ctx.ellipse(0,-r*0.5,r*0.5,r*0.6,0,0,Math.PI*2); ctx.fill();
   // pale skull face
@@ -1785,13 +1792,13 @@ function drawWeaponIcon(type, r, color){
     ctx.fillStyle='#9a9aa8'; ctx.fillRect(-6,2,5,6); // mag
     ctx.fillRect(-12,1,4,5); // stock
   } else if(type==='ak'){
-    // AK-47: barrel + curved banana magazine + wood stock
-    ctx.fillStyle='#2a2a30'; ctx.fillRect(-12,-2,23,5);     // receiver/barrel
-    ctx.fillStyle=color; ctx.fillRect(9,-3,4,7);            // muzzle (orange/wood)
-    ctx.fillStyle='#8a5a2a'; ctx.fillRect(-13,1,5,5);       // wood stock
-    // curved magazine
-    ctx.fillStyle='#3a3a42';
-    ctx.beginPath(); ctx.moveTo(-4,3); ctx.lineTo(2,3); ctx.lineTo(5,11); ctx.lineTo(-1,11); ctx.closePath(); ctx.fill();
+    // AK-47: light receiver + wood stock + curved banana magazine (visible on the dark crate)
+    ctx.fillStyle='#e8e6f5'; ctx.fillRect(-12,-2,23,5);     // receiver/barrel (light)
+    ctx.fillStyle=color;     ctx.fillRect(9,-3,4,7);        // muzzle (AK orange/wood)
+    ctx.fillStyle='#b97a34'; ctx.fillRect(-13,1,6,5);       // wood stock
+    // curved banana magazine
+    ctx.fillStyle='#c8783c';
+    ctx.beginPath(); ctx.moveTo(-4,3); ctx.lineTo(3,3); ctx.lineTo(7,12); ctx.lineTo(0,12); ctx.closePath(); ctx.fill();
   } else if(type==='shotgun'){
     ctx.fillRect(-12,-3,20,4);     // top barrel
     ctx.fillRect(-12,1,20,4);      // bottom barrel
@@ -1837,18 +1844,45 @@ function drawSoldier(p){
   ctx.globalAlpha=0.18; ctx.fillStyle=ch.glow;
   ctx.beginPath(); ctx.arc(0,0,r+9,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
 
-  // INFERNO: flickering fire aura
+  const _T=performance.now();
+  // ===== special skin effects drawn BEHIND the body =====
   if(ch.fire){
-    const t=performance.now()/90;
-    for(let i=0;i<10;i++){
-      const a=(i/10)*Math.PI*2;
-      const fl=r*(1.0+0.55*Math.abs(Math.sin(t+i*1.7)));
+    // INFERNO: big flickering flames + pulsing core + radiating embers
+    const t=_T/90;
+    for(let i=0;i<12;i++){
+      const a=(i/12)*Math.PI*2;
+      const fl=r*(1.1+0.6*Math.abs(Math.sin(t+i*1.7)));
       const bx=Math.cos(a)*r*0.7, by=Math.sin(a)*r*0.7;
       const tx=Math.cos(a)*fl, ty=Math.sin(a)*fl;
-      const px=-Math.sin(a)*r*0.22, py=Math.cos(a)*r*0.22;
-      ctx.fillStyle = (i%2) ? 'rgba(255,180,30,0.85)' : 'rgba(255,80,18,0.85)';
+      const px=-Math.sin(a)*r*0.24, py=Math.cos(a)*r*0.24;
+      ctx.fillStyle = (i%2) ? 'rgba(255,190,40,0.9)' : 'rgba(255,70,15,0.9)';
       ctx.beginPath(); ctx.moveTo(bx-px,by-py); ctx.lineTo(tx,ty); ctx.lineTo(bx+px,by+py); ctx.closePath(); ctx.fill();
     }
+    ctx.globalAlpha=0.3+0.2*Math.sin(t*1.5); ctx.fillStyle='#ffd24d';
+    ctx.beginPath(); ctx.arc(0,0,r*0.95,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
+    for(let i=0;i<6;i++){
+      const a=t*0.6+i*2.1, d=r*(1.35+(i%3)*0.25+0.3*Math.sin(t*2+i));
+      ctx.globalAlpha=0.4+0.5*Math.abs(Math.sin(t*3+i*2));
+      ctx.fillStyle=i%2?'#ffe08a':'#ff8a2a';
+      ctx.beginPath(); ctx.arc(Math.cos(a)*d, Math.sin(a)*d, r*0.1, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  }
+  if(ch.shark){
+    // SHARK: swaying caudal tail fin trailing behind
+    const sway=Math.sin(_T/200*2)*r*0.45;
+    ctx.fillStyle=ch.body;
+    ctx.beginPath();
+    ctx.moveTo(0,r*0.85);
+    ctx.lineTo(-r*0.5+sway, r*1.65); ctx.lineTo(0, r*1.25); ctx.lineTo(r*0.5+sway, r*1.65);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.lineWidth=1.5; ctx.stroke();
+  }
+  if(ch.light){
+    // WHITE OPS: pulsing white energy ring
+    const t=_T/300;
+    ctx.globalAlpha=0.25+0.2*Math.sin(t*2); ctx.strokeStyle='#ffffff'; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.arc(0,0,r*1.25+Math.sin(t*2)*3,0,Math.PI*2); ctx.stroke(); ctx.globalAlpha=1;
   }
 
   // body / tactical vest (rounded torso)
@@ -1950,6 +1984,34 @@ function drawSoldier(p){
     // helmet front brim
     ctx.fillStyle=ch.brim;
     ctx.beginPath(); ctx.ellipse(0,-r*0.55,r*0.5,r*0.22,0,0,Math.PI*2); ctx.fill();
+  }
+
+  // ===== special skin effects drawn ON TOP =====
+  if(ch.shark){
+    // SHARK: bubbles drifting outward
+    const t=_T/500;
+    ctx.strokeStyle='rgba(180,230,255,0.75)'; ctx.lineWidth=1.5;
+    for(let i=0;i<5;i++){
+      const ph=(t+i*0.37)%1, a=i*2.3+t*0.6, d=r*0.6+ph*r*1.4;
+      ctx.globalAlpha=(1-ph)*0.8;
+      ctx.beginPath(); ctx.arc(Math.cos(a)*d, Math.sin(a)*d, r*0.12*(1-ph*0.4), 0, Math.PI*2); ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+  }
+  if(ch.light){
+    // WHITE OPS: twinkling orbiting sparkles
+    const t=_T/300;
+    for(let i=0;i<5;i++){
+      const a=t*1.2+i*(Math.PI*2/5);
+      const sx=Math.cos(a)*r*1.35, sy=Math.sin(a)*r*1.35;
+      const tw=0.5+0.5*Math.sin(t*4+i*2), s=r*0.13*(0.6+tw*0.7);
+      ctx.globalAlpha=0.35+0.6*tw; ctx.fillStyle='#eaf4ff';
+      ctx.beginPath();
+      ctx.moveTo(sx,sy-s); ctx.lineTo(sx+s*0.32,sy); ctx.lineTo(sx,sy+s); ctx.lineTo(sx-s*0.32,sy); ctx.closePath();
+      ctx.moveTo(sx-s,sy); ctx.lineTo(sx,sy-s*0.32); ctx.lineTo(sx+s,sy); ctx.lineTo(sx,sy+s*0.32); ctx.closePath();
+      ctx.fill();
+    }
+    ctx.globalAlpha=1;
   }
 
   ctx.restore();
@@ -2250,7 +2312,8 @@ function netTeardown(){
 
 // ---- Button wiring ----
 document.getElementById('startBtn').onclick=startGame;
-document.getElementById('onlineBtn').onclick=openLobby;
+// Online co-op paused: menu button removed (lobby code kept for later)
+const _onlineBtn=document.getElementById('onlineBtn'); if(_onlineBtn) _onlineBtn.onclick=openLobby;
 document.getElementById('armoryBtn').onclick=openShop;
 document.getElementById('charBtn').onclick=openChars;
 document.getElementById('charDoneBtn').onclick=closeChars;
