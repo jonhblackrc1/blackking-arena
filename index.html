@@ -43,6 +43,20 @@
   .ubuy:active { transform:scale(0.94); }
   .ubuy.off { opacity:0.4; }
   .umax { color:#5aff8a; font-weight:bold; font-size:12px; min-width:60px; text-align:center; }
+  #pauseBtn {
+    position:fixed; top:calc(env(safe-area-inset-top,0px) + 8px); left:50%; transform:translateX(-50%);
+    z-index:8; display:none; width:48px; height:48px; border-radius:12px; padding:0;
+    background:rgba(20,30,15,0.55); border:1.5px solid rgba(150,200,120,0.5);
+    color:#e8f5e6; font-size:20px; line-height:1; cursor:pointer;
+    align-items:center; justify-content:center; -webkit-tap-highlight-color:transparent;
+  }
+  #pauseBtn:active { transform:translateX(-50%) scale(0.92); }
+  #pauseScreen .btnRow, #settingsScreen .btnRow { flex-direction:column; gap:12px; }
+  #pauseScreen .btn, #settingsScreen .btn { min-width:220px; }
+  .setrow { display:flex; align-items:center; justify-content:space-between; padding:11px 12px; border-bottom:1px solid rgba(120,160,90,0.18); }
+  .setlabel { color:#e8e6f5; font-size:16px; }
+  .settoggle { min-width:66px; padding:8px 16px; border-radius:20px; border:2px solid #6a5a8c; background:transparent; color:#9b94c4; font-weight:bold; font-size:14px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .settoggle.on { background:linear-gradient(135deg,#5aff8a,#42c8ff); color:#0b0d18; border-color:transparent; }
   #lobbyScreen input::placeholder { color:#5a6b4a; }
   .title {
     font-size:clamp(38px,11vw,82px); font-weight:900; letter-spacing:4px;
@@ -92,6 +106,7 @@
 </head>
 <body>
 <canvas id="game"></canvas>
+<button id="pauseBtn" aria-label="Menu">&#9208;</button>
 
 <div class="hud" id="hud" style="display:none">
   <div>
@@ -204,6 +219,24 @@
   <button class="btn btn-alt" id="shopBackBtn" style="margin-top:16px">← BACK</button>
 </div>
 
+<!-- ===== In-game pause menu ===== -->
+<div class="overlay hidden" id="pauseScreen">
+  <div class="title" style="font-size:clamp(30px,9vw,60px)">PAUSED</div>
+  <div class="btnRow" style="margin-top:24px">
+    <button class="btn" id="resumeBtn">RESUME</button>
+    <button class="btn btn-alt" id="muteBtn">&#128266; SOUND ON</button>
+    <button class="btn btn-alt" id="settingsBtn">&#9881; SETTINGS</button>
+    <button class="btn btn-alt" id="quitGameBtn">QUIT TO MENU</button>
+  </div>
+</div>
+
+<!-- ===== Settings ===== -->
+<div class="overlay hidden" id="settingsScreen">
+  <div class="title" style="font-size:clamp(28px,8vw,52px)">&#9881; SETTINGS</div>
+  <div id="settingsList" style="margin-top:18px;width:min(86vw,340px)"></div>
+  <button class="btn btn-alt" id="settingsBackBtn" style="margin-top:18px">&#8592; BACK</button>
+</div>
+
 <script src="peerjs.min.js"></script>
 <script>
 // roundRect polyfill (older mobile browsers)
@@ -228,7 +261,7 @@ if(!CanvasRenderingContext2D.prototype.roundRect){
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 let W, H, DPR;
-let ZOOM=0.868;         // 0.62 * 1.4 → camera 40% closer
+let ZOOM=0.651;         // 0.868 * 0.75 → camera 25% farther
 let VW=0, VH=0;         // visible world size = screen / zoom
 function resize(){
   DPR = Math.min(window.devicePixelRatio||1, 2);
@@ -291,21 +324,23 @@ const LEVELS=[
 // ---- Weapon types (picked up on the field) ----
 // fireRate lower = faster; dmg = damage per bullet; spread = extra bullets; bulletColor for flavor
 const WEAPONS={
-  pistol:  {name:"PISTOL",   fireRate:18, dmg:1, pellets:1, spread:0,    speed:9,  color:'#cfd2dc'},
-  rifle:   {name:"RIFLE",    fireRate:9,  dmg:1, pellets:1, spread:0,    speed:11, color:'#f5d77a'},
-  shotgun: {name:"SHOTGUN",  fireRate:30, dmg:2, pellets:5, spread:0.5,  speed:8,  color:'#ff9d4d'},
-  smg:     {name:"SMG",      fireRate:5,  dmg:1, pellets:1, spread:0.12, speed:10, color:'#5ad1ff'},
-  // ---- Rare golden weapons (10% chance each to spawn) ----
-  scar:        {name:"GOLDEN SCAR",    fireRate:6,  dmg:3, pellets:1, spread:0.05, speed:13, color:'#ffd24d',
+  pistol:  {name:"PISTOL",   fireRate:18, dmg:1,    pellets:1, spread:0,    speed:9,  color:'#cfd2dc'},
+  rifle:   {name:"RIFLE",    fireRate:9,  dmg:1.1,  pellets:1, spread:0,    speed:11, color:'#f5d77a'}, // +10% damage
+  ak:      {name:"AK-47",    fireRate:8,  dmg:1.54, pellets:1, spread:0.06, speed:12, color:'#c8783c'}, // 40% more than the rifle
+  shotgun: {name:"SHOTGUN",  fireRate:30, dmg:2,    pellets:5, spread:0.5,  speed:8,  color:'#ff9d4d'},
+  smg:     {name:"SMG",      fireRate:5,  dmg:1,    pellets:1, spread:0.12, speed:10, color:'#5ad1ff'},
+  // ---- Rare golden weapons (10% chance each to spawn) — damage reduced 33% ----
+  scar:        {name:"GOLDEN SCAR",    fireRate:6,  dmg:2, pellets:1, spread:0.05, speed:13, color:'#ffd24d',
                 bulletR:9, bulletLife:95, pierce:4, special:'gold', gunScale:1.4},
-  goldshotgun: {name:"GOLDEN SHOTGUN", fireRate:30, dmg:6, pellets:5, spread:0.5,  speed:8,  color:'#ffd24d',
-                bulletR:7, bulletLife:80, special:'gold', gunScale:1.3}, // triple the normal shotgun's damage
+  goldshotgun: {name:"GOLDEN SHOTGUN", fireRate:30, dmg:4, pellets:5, spread:0.5,  speed:8,  color:'#ffd24d',
+                bulletR:7, bulletLife:80, special:'gold', gunScale:1.3},
 };
-// weighted spawn pool: each golden weapon = 10%, the 3 normals share the other 80%
+// weighted spawn pool: each golden weapon = 10%, the 4 normals share the other 80%
 const WEAPON_SPAWN=[
-  {key:'rifle',       w:80/3},
-  {key:'shotgun',     w:80/3},
-  {key:'smg',         w:80/3},
+  {key:'rifle',       w:80/4},
+  {key:'ak',          w:80/4},
+  {key:'shotgun',     w:80/4},
+  {key:'smg',         w:80/4},
   {key:'scar',        w:10},
   {key:'goldshotgun', w:10},
 ];
@@ -327,6 +362,9 @@ const UPGRADES={
   rifle:       {name:'RIFLE', tracks:[
     {k:'dmg', label:'+1 Damage',   stat:'dmg',      per:1,  max:5, costs:[250,500,1000,1900,3200]},
     {k:'rate',label:'Faster Fire', stat:'fireRate', per:-1, min:3, max:4, costs:[300,650,1300,2400]} ]},
+  ak:          {name:'AK-47', tracks:[
+    {k:'dmg', label:'+1 Damage',   stat:'dmg',      per:1,  max:5, costs:[300,600,1200,2200,3600]},
+    {k:'rate',label:'Faster Fire', stat:'fireRate', per:-1, min:3, max:4, costs:[350,750,1500,2700]} ]},
   shotgun:     {name:'SHOTGUN', tracks:[
     {k:'dmg', label:'+1 Damage',   stat:'dmg',      per:1,  max:5, costs:[250,500,1000,1900,3200]},
     {k:'pel', label:'+1 Pellet',   stat:'pellets',  per:1,  max:4, costs:[400,850,1600,2900]} ]},
@@ -397,10 +435,51 @@ const PEER_CONFIG={ debug:1, config:{ iceServers:[
 function alivePlayers(){ return players.filter(p=>!p.out); }
 // apply damage to a player: the shield soaks it up first, then health
 function damagePlayer(p, amt){
-  if(p.out || p.invuln>0) return;
+  if(p.out || p.invuln>0) return false;
   if(p.shield>0){ const a=Math.min(p.shield, amt); p.shield-=a; amt-=a; }
   if(amt>0) p.hp-=amt;
+  return true;
 }
+
+// ---- Settings, sound (synth, no files) & haptics ----
+const settings = (function(){
+  let s={ sound:true, vibration:true, shake:true };
+  try{ s=Object.assign(s, JSON.parse(localStorage.getItem('bk_settings')||'{}')); }catch(e){}
+  return s;
+})();
+function saveSettings(){ try{ localStorage.setItem('bk_settings', JSON.stringify(settings)); }catch(e){} }
+let audioCtx=null;
+function ensureAudio(){
+  if(!audioCtx){ try{ audioCtx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+  if(audioCtx && audioCtx.state==='suspended'){ audioCtx.resume().catch(()=>{}); }
+  return audioCtx;
+}
+const _sfxLast={};
+function sfx(type){
+  if(!settings.sound) return;
+  const ac=ensureAudio(); if(!ac) return;
+  const now=ac.currentTime;
+  const gaps={shoot:0.05, hurt:0.12, enemyDie:0.03}; // throttle the spammy ones
+  if(gaps[type]){ if(now-(_sfxLast[type]||0) < gaps[type]) return; _sfxLast[type]=now; }
+  let f=440,dur=0.08,vol=0.06,wave='square',slide=0;
+  if(type==='shoot'){ f=200; dur=0.05; vol=0.035; wave='square'; }
+  else if(type==='enemyDie'){ f=130; dur=0.13; vol=0.06; wave='triangle'; slide=-0.6; }
+  else if(type==='hurt'){ f=85; dur=0.18; vol=0.09; wave='sawtooth'; slide=-0.4; }
+  else if(type==='pickup'){ f=660; dur=0.13; vol=0.07; wave='sine'; slide=0.6; }
+  else if(type==='boss'){ f=60; dur=0.6; vol=0.11; wave='sawtooth'; slide=-0.3; }
+  else if(type==='win'){ f=520; dur=0.45; vol=0.1; wave='sine'; slide=0.6; }
+  else if(type==='lose'){ f=110; dur=0.6; vol=0.1; wave='sawtooth'; slide=-0.5; }
+  const o=ac.createOscillator(), g=ac.createGain();
+  o.connect(g); g.connect(ac.destination);
+  o.type=wave; o.frequency.setValueAtTime(f, now);
+  if(slide) o.frequency.exponentialRampToValueAtTime(Math.max(20, f*(1+slide)), now+dur);
+  g.gain.setValueAtTime(vol, now);
+  g.gain.exponentialRampToValueAtTime(0.0001, now+dur);
+  o.start(now); o.stop(now+dur);
+}
+function haptic(p){ if(settings.vibration && navigator.vibrate){ try{ navigator.vibrate(p); }catch(e){} } }
+let shakeT=0;
+function addShake(amt){ if(settings.shake) shakeT=Math.min(1, shakeT+amt); }
 
 // ---- Score ----
 let score=0;
@@ -491,6 +570,44 @@ function buyUpgrade(weapon, track){
 }
 function openShop(){ startScreen.classList.add('hidden'); shopScreen.classList.remove('hidden'); renderShop(); }
 function closeShop(){ shopScreen.classList.add('hidden'); startScreen.classList.remove('hidden'); }
+
+// ---- In-game pause menu & settings ----
+const pauseScreen=document.getElementById('pauseScreen');
+const settingsScreen=document.getElementById('settingsScreen');
+const settingsList=document.getElementById('settingsList');
+const muteBtn=document.getElementById('muteBtn');
+function updateMuteBtn(){ if(muteBtn) muteBtn.innerHTML = settings.sound ? '🔊 SOUND ON' : '🔇 MUTED'; }
+function openPause(){
+  ensureAudio();
+  if(net.mode==='off' && state==='play') state='paused'; // pause single-player; online keeps running
+  updateMuteBtn();
+  settingsScreen.classList.add('hidden');
+  pauseScreen.classList.remove('hidden');
+}
+function resumeGame(){
+  pauseScreen.classList.add('hidden');
+  settingsScreen.classList.add('hidden');
+  if(net.mode==='off' && state==='paused') state='play';
+}
+function openSettings(){ pauseScreen.classList.add('hidden'); settingsScreen.classList.remove('hidden'); renderSettings(); }
+function closeSettings(){ settingsScreen.classList.add('hidden'); pauseScreen.classList.remove('hidden'); }
+function quitFromPause(){ pauseScreen.classList.add('hidden'); settingsScreen.classList.add('hidden'); quitToMenu(); }
+const SETTING_ITEMS=[
+  {k:'sound',     label:'Sound effects'},
+  {k:'vibration', label:'Vibration'},
+  {k:'shake',     label:'Screen shake'},
+];
+function renderSettings(){
+  settingsList.innerHTML = SETTING_ITEMS.map(it=>
+    '<div class="setrow"><span class="setlabel">'+it.label+'</span>'+
+    '<button class="settoggle'+(settings[it.k]?' on':'')+'" data-k="'+it.k+'">'+(settings[it.k]?'ON':'OFF')+'</button></div>'
+  ).join('');
+  settingsList.querySelectorAll('.settoggle').forEach(b=>{
+    b.onclick=()=>{ const k=b.getAttribute('data-k'); settings[k]=!settings[k]; saveSettings(); renderSettings(); updateMuteBtn();
+      if(k==='sound' && settings.sound){ ensureAudio(); sfx('pickup'); }
+      if(k==='vibration' && settings.vibration){ haptic(30); } };
+  });
+}
 function prepSaveRow(){
   if(!nameInput) return;
   nameInput.disabled=false; saveScoreBtn.disabled=false; saveScoreBtn.style.opacity='1';
@@ -607,6 +724,7 @@ function spawnBoss(){
   bossSpawned=true;
   bossNameEl.textContent=b.name;
   bossWrap.classList.add('show');
+  sfx('boss'); addShake(0.8); haptic([80,40,80]);
 }
 
 function setShieldBar(sh, maxSh){
@@ -705,6 +823,12 @@ window.addEventListener('keydown',e=>{
   if(e.repeat){ if(GAME_KEYS.includes(e.key.toLowerCase())) e.preventDefault(); return; }
   const k=e.key.toLowerCase();
   keys[k]=true;
+  // Esc / P toggles the in-game pause menu
+  if(k==='escape'||k==='p'){
+    if(state==='play') openPause();
+    else if(state==='paused' && !pauseScreen.classList.contains('hidden')) resumeGame();
+    if(k==='p') return;
+  }
   // Enter / Space starts or restarts the game from the menu & game-over screens
   if((k==='enter'||k===' ') && state!=='play'){
     const lobbyOpen = !lobbyScreen.classList.contains('hidden');
@@ -792,6 +916,7 @@ function update(){
               pierce:w.pierce, special:w.special, hitList:w.pierce?[]:null});
           }
           p.fireCD=w.fireRate; p.flash=5;
+          if(p.isLocal) sfx('shoot');
         }
       }
       // aim: face nearest enemy, else movement direction
@@ -880,7 +1005,8 @@ function update(){
       if(e.hp<=0){
         spawnParticles(e.x,e.y,e.boss?e.color:'#caa3ff',e.boss?40:14);
         enemies.splice(i,1);
-        if(e.boss){ addScore(1000+level*250); boss=null; bossSpawned=false; bossWrap.classList.remove('show'); levelClear(); }
+        sfx('enemyDie');
+        if(e.boss){ addScore(1000+level*250); boss=null; bossSpawned=false; bossWrap.classList.remove('show'); addShake(0.6); haptic([40,30,40]); levelClear(); }
         else { addScore(100); }
       }
     }
@@ -891,7 +1017,7 @@ function update(){
       let hit=false;
       for(const p of players){
         if(p.out) continue;
-        if(Math.hypot(p.x-b.x,p.y-b.y)<p.r+b.r){ damagePlayer(p, 6); spawnParticles(b.x,b.y,'#ff5a7a',8); hit=true; break; }
+        if(Math.hypot(p.x-b.x,p.y-b.y)<p.r+b.r){ if(damagePlayer(p,6) && p.isLocal){ sfx('hurt'); haptic(40); addShake(0.5); } spawnParticles(b.x,b.y,'#ff5a7a',8); hit=true; break; }
       }
       if(hit){ eBullets.splice(i,1); continue; }
       if(b.life<=0||b.x<0||b.y<0||b.x>MAP_W||b.y>MAP_H) eBullets.splice(i,1);
@@ -913,6 +1039,7 @@ function update(){
           if(pk.kind==='health'){ p.hp=Math.min(p.maxHp,p.hp+40); spawnParticles(pk.x,pk.y,'#5aff8a',16); if(p.isLocal) showToast('+40 HP'); }
           else if(pk.kind==='shield'){ p.shield=Math.min(p.maxShield,(p.shield||0)+50); spawnParticles(pk.x,pk.y,'#5ad1ff',16); if(p.isLocal) showToast('+50 SHIELD'); }
           else if(pk.kind==='weapon'){ p.weapon=pk.weapon; spawnParticles(pk.x,pk.y,WEAPONS[pk.weapon].color,16); if(p.isLocal) showToast(WEAPONS[pk.weapon].name+'!'); }
+          if(p.isLocal){ sfx('pickup'); haptic(15); }
           taken=true; break;
         }
       }
@@ -963,6 +1090,7 @@ function levelClear(){
 function gameOver(win){
   state='over';
   lastWin=win;
+  sfx(win?'win':'lose'); haptic(win?[60,40,60,40,120]:[300]);
   hud.style.display='none';
   bossWrap.classList.remove('show');
   // tell clients immediately (host)
@@ -1125,10 +1253,19 @@ function drawTree(d){
 function circle(x,y,r,col){ ctx.fillStyle=col; ctx.beginPath(); ctx.arc(x-cam.x,y-cam.y,r,0,Math.PI*2); ctx.fill(); }
 
 function render(){
+  // show the pause/menu button only while in a game (and not when the pause menu is open)
+  const inGame = (state==='play'||state==='paused'||state==='transition');
+  pauseBtn.style.display = (inGame && pauseScreen.classList.contains('hidden') && settingsScreen.classList.contains('hidden')) ? 'flex' : 'none';
+
   ctx.fillStyle='#0a0b07'; ctx.fillRect(0,0,W,H);
   if(state==='menu'){ return; }
   ctx.save();
   ctx.scale(ZOOM,ZOOM);
+  // screen shake (decays over time)
+  if(shakeT>0){
+    ctx.translate((Math.random()-0.5)*shakeT*14, (Math.random()-0.5)*shakeT*14);
+    shakeT=Math.max(0, shakeT-0.05);
+  }
   drawGround();
   drawDecor();
   drawBoundary();
@@ -1590,6 +1727,14 @@ function drawWeaponIcon(type, r, color){
     ctx.fillStyle=color; ctx.fillRect(8,-3,4,7); // muzzle
     ctx.fillStyle='#9a9aa8'; ctx.fillRect(-6,2,5,6); // mag
     ctx.fillRect(-12,1,4,5); // stock
+  } else if(type==='ak'){
+    // AK-47: barrel + curved banana magazine + wood stock
+    ctx.fillStyle='#2a2a30'; ctx.fillRect(-12,-2,23,5);     // receiver/barrel
+    ctx.fillStyle=color; ctx.fillRect(9,-3,4,7);            // muzzle (orange/wood)
+    ctx.fillStyle='#8a5a2a'; ctx.fillRect(-13,1,5,5);       // wood stock
+    // curved magazine
+    ctx.fillStyle='#3a3a42';
+    ctx.beginPath(); ctx.moveTo(-4,3); ctx.lineTo(2,3); ctx.lineTo(5,11); ctx.lineTo(-1,11); ctx.closePath(); ctx.fill();
   } else if(type==='shotgun'){
     ctx.fillRect(-12,-3,20,4);     // top barrel
     ctx.fillRect(-12,1,20,4);      // bottom barrel
@@ -1769,14 +1914,17 @@ const startCoopBtn=document.getElementById('startCoopBtn'), codeInput=document.g
 
 // ---- Single player ----
 function startGame(){
+  ensureAudio(); // unlock audio on this user gesture
   netTeardown();
   startScreen.classList.add('hidden'); overScreen.classList.add('hidden'); lobbyScreen.classList.add('hidden');
+  pauseScreen.classList.add('hidden'); settingsScreen.classList.add('hidden');
   hud.style.display='flex'; endmsg.style.fontSize='';
   score=0; addScore(0);
   resetLocalPlayer(); buildWorld(); startLevel(0); state='play';
 }
 function goToMenu(){
   overScreen.classList.add('hidden'); lobbyScreen.classList.add('hidden');
+  pauseScreen.classList.add('hidden'); settingsScreen.classList.add('hidden');
   hud.style.display='none'; bossWrap.classList.remove('show');
   startScreen.classList.remove('hidden'); state='menu';
 }
@@ -1975,6 +2123,12 @@ document.getElementById('startBtn').onclick=startGame;
 document.getElementById('onlineBtn').onclick=openLobby;
 document.getElementById('armoryBtn').onclick=openShop;
 document.getElementById('shopBackBtn').onclick=closeShop;
+document.getElementById('pauseBtn').onclick=openPause;
+document.getElementById('resumeBtn').onclick=resumeGame;
+muteBtn.onclick=()=>{ settings.sound=!settings.sound; saveSettings(); updateMuteBtn(); if(settings.sound){ ensureAudio(); sfx('pickup'); } };
+document.getElementById('settingsBtn').onclick=openSettings;
+document.getElementById('settingsBackBtn').onclick=closeSettings;
+document.getElementById('quitGameBtn').onclick=quitFromPause;
 document.getElementById('createRoomBtn').onclick=hostCreateRoom;
 document.getElementById('joinRoomBtn').onclick=()=>{ showLobbyView(lobbyJoin); setTimeout(()=>codeInput.focus(),60); };
 document.getElementById('lobbyBackBtn').onclick=()=>{ netTeardown(); goToMenu(); };
