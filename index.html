@@ -57,6 +57,12 @@
   .setlabel { color:#e8e6f5; font-size:16px; }
   .settoggle { min-width:66px; padding:8px 16px; border-radius:20px; border:2px solid #6a5a8c; background:transparent; color:#9b94c4; font-weight:bold; font-size:14px; cursor:pointer; -webkit-tap-highlight-color:transparent; }
   .settoggle.on { background:linear-gradient(135deg,#5aff8a,#42c8ff); color:#0b0d18; border-color:transparent; }
+  #charGrid { display:grid; grid-template-columns:1fr 1fr; gap:12px; width:min(90vw,360px); margin:12px 0; }
+  .charcard { background:rgba(120,160,90,0.07); border:2px solid rgba(120,160,90,0.25); border-radius:14px; padding:16px 8px; text-align:center; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .charcard:active { transform:scale(0.96); }
+  .charcard.sel { border-color:#5aff8a; background:rgba(90,255,138,0.12); box-shadow:0 0 16px rgba(90,255,138,0.25); }
+  .charemoji { font-size:46px; line-height:1; }
+  .charname { margin-top:8px; font-size:14px; font-weight:bold; color:#e8e6f5; letter-spacing:1px; }
   #lobbyScreen input::placeholder { color:#5a6b4a; }
   .title {
     font-size:clamp(38px,11vw,82px); font-weight:900; letter-spacing:4px;
@@ -138,7 +144,8 @@
     <button class="btn" id="startBtn">SINGLE PLAYER</button>
     <button class="btn btn-alt" id="onlineBtn">ONLINE CO-OP</button>
   </div>
-  <button class="btn btn-alt" id="armoryBtn" style="margin-top:14px">⚙ ARMORY · UPGRADES</button>
+  <button class="btn btn-alt" id="charBtn" style="margin-top:14px">🦸 CHARACTER</button>
+  <button class="btn btn-alt" id="armoryBtn" style="margin-top:10px">⚙ ARMORY · UPGRADES</button>
   <div class="info">
     <b>Joystick</b> (left): drag to move your character in any direction.<br>
     <b>⚔ Button</b> (right): hold to fire at the nearest enemy.<br>
@@ -237,6 +244,14 @@
   <button class="btn btn-alt" id="settingsBackBtn" style="margin-top:18px">&#8592; BACK</button>
 </div>
 
+<!-- ===== Character select ===== -->
+<div class="overlay hidden" id="charScreen">
+  <div class="title" style="font-size:clamp(26px,7vw,48px)">CHARACTER</div>
+  <div class="info" style="margin:6px 0 2px">Pick your fighter.</div>
+  <div id="charGrid"></div>
+  <button class="btn" id="charDoneBtn" style="margin-top:8px">DONE</button>
+</div>
+
 <script src="peerjs.min.js"></script>
 <script>
 // roundRect polyfill (older mobile browsers)
@@ -261,7 +276,7 @@ if(!CanvasRenderingContext2D.prototype.roundRect){
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 let W, H, DPR;
-let ZOOM=0.651;         // 0.868 * 0.75 → camera 25% farther
+let ZOOM=0.488;         // 0.651 * 0.75 → camera another 25% farther
 let VW=0, VH=0;         // visible world size = screen / zoom
 function resize(){
   DPR = Math.min(window.devicePixelRatio||1, 2);
@@ -290,7 +305,7 @@ const endmsg=document.getElementById('endmsg'), overSub=document.getElementById(
 const retryBtn=document.getElementById('retryBtn'), quitBtn=document.getElementById('quitBtn');
 
 // ---- World ----
-const MAP_W=2800, MAP_H=2800;
+const MAP_W=2100, MAP_H=2800; // width reduced 25% (2800 -> 2100)
 let cam={x:0,y:0};
 let decor=[]; // post-apocalyptic scenery (buildings, cars, debris, ...)
 function updateView(){ VW=W/ZOOM; VH=H/ZOOM; }
@@ -324,15 +339,16 @@ const LEVELS=[
 // ---- Weapon types (picked up on the field) ----
 // fireRate lower = faster; dmg = damage per bullet; spread = extra bullets; bulletColor for flavor
 const WEAPONS={
-  pistol:  {name:"PISTOL",   fireRate:18, dmg:1,    pellets:1, spread:0,    speed:9,  color:'#cfd2dc'},
-  rifle:   {name:"RIFLE",    fireRate:9,  dmg:1.1,  pellets:1, spread:0,    speed:11, color:'#f5d77a'}, // +10% damage
-  ak:      {name:"AK-47",    fireRate:8,  dmg:1.54, pellets:1, spread:0.06, speed:12, color:'#c8783c'}, // 40% more than the rifle
-  shotgun: {name:"SHOTGUN",  fireRate:30, dmg:2,    pellets:5, spread:0.5,  speed:8,  color:'#ff9d4d'},
-  smg:     {name:"SMG",      fireRate:5,  dmg:1,    pellets:1, spread:0.12, speed:10, color:'#5ad1ff'},
-  // ---- Rare golden weapons (10% chance each to spawn) — damage reduced 33% ----
-  scar:        {name:"GOLDEN SCAR",    fireRate:6,  dmg:2, pellets:1, spread:0.05, speed:13, color:'#ffd24d',
+  // damage values are 30% lower than before across all weapons
+  pistol:  {name:"PISTOL",   fireRate:18, dmg:0.7,   pellets:1, spread:0,    speed:9,  color:'#cfd2dc'},
+  rifle:   {name:"RIFLE",    fireRate:9,  dmg:0.77,  pellets:1, spread:0,    speed:11, color:'#f5d77a'},
+  ak:      {name:"AK-47",    fireRate:8,  dmg:1.08,  pellets:1, spread:0.06, speed:12, color:'#c8783c'}, // 40% more than the rifle
+  shotgun: {name:"SHOTGUN",  fireRate:30, dmg:1.4,   pellets:5, spread:0.5,  speed:8,  color:'#ff9d4d'},
+  smg:     {name:"SMG",      fireRate:5,  dmg:0.7,   pellets:1, spread:0.12, speed:10, color:'#5ad1ff'},
+  // ---- Rare golden weapons (10% chance each to spawn) ----
+  scar:        {name:"GOLDEN SCAR",    fireRate:6,  dmg:1.4, pellets:1, spread:0.05, speed:13, color:'#ffd24d',
                 bulletR:9, bulletLife:95, pierce:4, special:'gold', gunScale:1.4},
-  goldshotgun: {name:"GOLDEN SHOTGUN", fireRate:30, dmg:4, pellets:5, spread:0.5,  speed:8,  color:'#ffd24d',
+  goldshotgun: {name:"GOLDEN SHOTGUN", fireRate:30, dmg:2.8, pellets:5, spread:0.5,  speed:8,  color:'#ffd24d',
                 bulletR:7, bulletLife:80, special:'gold', gunScale:1.3},
 };
 // weighted spawn pool: each golden weapon = 10%, the 4 normals share the other 80%
@@ -407,10 +423,22 @@ let players=[];        // every player in the simulation
 let player=null;       // the local player on this device (camera follows it)
 let localPlayer=null;  // alias of player
 const PLAYER_COLORS=['#f5d77a','#5ad1ff','#5aff8a','#ff7ad1','#caa3ff','#ffae42'];
+
+// ---- Selectable characters (skins) ----
+const CHARACTERS={
+  soldier: {name:'SOLDIER',   emoji:'🪖', body:'#3d4a2f', vest:'#2c3622', shoulder:'#4a5938', helmet:'#4a5938', helmet2:'#3d4a2f', brim:'#2c3622', glow:'#f5d77a'},
+  fire:    {name:'INFERNO',   emoji:'🔥', body:'#9a2c08', vest:'#6a1c04', shoulder:'#c24a14', helmet:'#d9531a', helmet2:'#9a2c08', brim:'#6a1c04', glow:'#ff7a1a', fire:true},
+  shark:   {name:'SHARK',     emoji:'🦈', body:'#5a6b78', vest:'#3f4d57', shoulder:'#6d7e8a', helmet:'#7d8e9a', helmet2:'#5a6b78', brim:'#3f4d57', glow:'#7fd4ff', shark:true},
+  white:   {name:'WHITE OPS', emoji:'⬜', body:'#e6e8ee', vest:'#cdd0d8', shoulder:'#f2f4f8', helmet:'#f2f4f8', helmet2:'#dce0e8', brim:'#c2c5cd', glow:'#ffffff'},
+};
+const CHAR_ORDER=['soldier','fire','shark','white'];
+let selectedChar = localStorage.getItem('bk_char');
+if(!CHARACTERS[selectedChar]) selectedChar='soldier';
 let nameCounter=0;
 function makePlayer(id,isLocal,colorIdx,name){
   return {id, isLocal:!!isLocal, color:PLAYER_COLORS[(colorIdx||0)%PLAYER_COLORS.length],
     name: name||('P'+((colorIdx||0)+1)),
+    char: isLocal ? selectedChar : 'soldier',
     x:MAP_W/2, y:MAP_H/2, r:16, hp:100, maxHp:100, speed:4.52, fireCD:0, dmg:1, /* 3.4 * 1.33 → 33% faster */
     shield:0, maxShield:100, /* absorbs damage before health; only gained from shield vests */
     dead:false, out:false, lives:3, invuln:0, aim:-Math.PI/2, flash:0, weapon:'pistol',
@@ -418,6 +446,7 @@ function makePlayer(id,isLocal,colorIdx,name){
 }
 function resetLocalPlayer(){
   player = makePlayer((net&&net.myId)||'local', true, 0, 'YOU');
+  player.char = selectedChar;
   localPlayer = player;
   players = [player];
 }
@@ -443,7 +472,7 @@ function damagePlayer(p, amt){
 
 // ---- Settings, sound (synth, no files) & haptics ----
 const settings = (function(){
-  let s={ sound:true, vibration:true, shake:true };
+  let s={ sound:true, vibration:true, shake:true, alert:true };
   try{ s=Object.assign(s, JSON.parse(localStorage.getItem('bk_settings')||'{}')); }catch(e){}
   return s;
 })();
@@ -571,6 +600,28 @@ function buyUpgrade(weapon, track){
 function openShop(){ startScreen.classList.add('hidden'); shopScreen.classList.remove('hidden'); renderShop(); }
 function closeShop(){ shopScreen.classList.add('hidden'); startScreen.classList.remove('hidden'); }
 
+// ---- Character select ----
+const charScreen=document.getElementById('charScreen');
+const charGrid=document.getElementById('charGrid');
+function renderChars(){
+  charGrid.innerHTML = CHAR_ORDER.map(k=>{
+    const c=CHARACTERS[k];
+    return '<div class="charcard'+(k===selectedChar?' sel':'')+'" data-c="'+k+'">'+
+      '<div class="charemoji">'+c.emoji+'</div><div class="charname">'+c.name+'</div></div>';
+  }).join('');
+  charGrid.querySelectorAll('.charcard').forEach(el=>{
+    el.onclick=()=>{
+      selectedChar=el.getAttribute('data-c');
+      localStorage.setItem('bk_char', selectedChar);
+      if(player && player.isLocal) player.char=selectedChar;
+      ensureAudio(); sfx('pickup');
+      renderChars();
+    };
+  });
+}
+function openChars(){ startScreen.classList.add('hidden'); charScreen.classList.remove('hidden'); renderChars(); }
+function closeChars(){ charScreen.classList.add('hidden'); startScreen.classList.remove('hidden'); }
+
 // ---- In-game pause menu & settings ----
 const pauseScreen=document.getElementById('pauseScreen');
 const settingsScreen=document.getElementById('settingsScreen');
@@ -596,6 +647,7 @@ const SETTING_ITEMS=[
   {k:'sound',     label:'Sound effects'},
   {k:'vibration', label:'Vibration'},
   {k:'shake',     label:'Screen shake'},
+  {k:'alert',     label:'Enemy alert'},
 ];
 function renderSettings(){
   settingsList.innerHTML = SETTING_ITEMS.map(it=>
@@ -667,10 +719,12 @@ function startLevel(idx){
   });
   const cX=MAP_W/2, cY=MAP_H/2;
   for(let i=0;i<cfg.enemies;i++){
-    let x,y,d;
-    do{ x=Math.random()*MAP_W; y=Math.random()*MAP_H;
-        d=Math.hypot(x-cX,y-cY);
-    }while(d<350);
+    // spawn enemies in a tight ring near the players (close), not scattered across the whole map
+    const ang=Math.random()*Math.PI*2;
+    const dist=320+Math.random()*420; // 320..740 from centre
+    let x=cX+Math.cos(ang)*dist, y=cY+Math.sin(ang)*dist;
+    x=Math.max(60,Math.min(MAP_W-60,x));
+    y=Math.max(60,Math.min(MAP_H-60,y));
     const melee = Math.random() < 0.45; // ~45% melee rushers, rest are ranged kiters
     if(melee){
       // melee: no ranged attack, faster, tougher — rushes in to deal contact damage
@@ -1351,6 +1405,9 @@ function render(){
   // on-screen controls
   drawControls();
 
+  // nearest-enemy alert (Fortnite-style)
+  drawThreatIndicator();
+
   // transition text
   if(state==='transition'){
     ctx.fillStyle='rgba(7,8,15,0.6)'; ctx.fillRect(0,0,W,H);
@@ -1771,27 +1828,49 @@ function drawWeaponIcon(type, r, color){
 
 function drawSoldier(p){
   const r=p.r, x=p.x-cam.x, y=p.y-cam.y;
+  const ch = CHARACTERS[p.char] || CHARACTERS.soldier;
   ctx.save();
   ctx.translate(x,y);
   ctx.rotate(p.aim+Math.PI/2); // sprite drawn facing "up", rotate so it faces aim
 
-  // subtle glow (tinted with the player's colour for co-op)
-  ctx.globalAlpha=0.18; ctx.fillStyle=p.color||'#f5d77a';
+  // subtle glow (character-tinted)
+  ctx.globalAlpha=0.18; ctx.fillStyle=ch.glow;
   ctx.beginPath(); ctx.arc(0,0,r+9,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
 
+  // INFERNO: flickering fire aura
+  if(ch.fire){
+    const t=performance.now()/90;
+    for(let i=0;i<10;i++){
+      const a=(i/10)*Math.PI*2;
+      const fl=r*(1.0+0.55*Math.abs(Math.sin(t+i*1.7)));
+      const bx=Math.cos(a)*r*0.7, by=Math.sin(a)*r*0.7;
+      const tx=Math.cos(a)*fl, ty=Math.sin(a)*fl;
+      const px=-Math.sin(a)*r*0.22, py=Math.cos(a)*r*0.22;
+      ctx.fillStyle = (i%2) ? 'rgba(255,180,30,0.85)' : 'rgba(255,80,18,0.85)';
+      ctx.beginPath(); ctx.moveTo(bx-px,by-py); ctx.lineTo(tx,ty); ctx.lineTo(bx+px,by+py); ctx.closePath(); ctx.fill();
+    }
+  }
+
   // body / tactical vest (rounded torso)
-  ctx.fillStyle='#3d4a2f';
+  ctx.fillStyle=ch.body;
   ctx.beginPath(); ctx.ellipse(0,2,r*0.95,r*1.05,0,0,Math.PI*2); ctx.fill();
   // vest plate
-  ctx.fillStyle='#2c3622';
+  ctx.fillStyle=ch.vest;
   ctx.beginPath(); ctx.roundRect(-r*0.5,-r*0.4,r*1.0,r*1.1,4); ctx.fill();
-  // vest straps (gold accent)
+  // vest straps (accent)
   ctx.strokeStyle='#caa3ff'; ctx.lineWidth=2;
   ctx.beginPath(); ctx.moveTo(-r*0.25,-r*0.4); ctx.lineTo(-r*0.25,r*0.7);
   ctx.moveTo(r*0.25,-r*0.4); ctx.lineTo(r*0.25,r*0.7); ctx.stroke();
 
+  // SHARK: dorsal fin down the spine
+  if(ch.shark){
+    ctx.fillStyle=ch.shoulder;
+    ctx.beginPath(); ctx.moveTo(0,-r*0.3); ctx.lineTo(-r*0.3,r*0.95); ctx.lineTo(r*0.3,r*0.95); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='rgba(0,0,0,0.25)'; ctx.lineWidth=1.5; ctx.stroke();
+  }
+
   // shoulders
-  ctx.fillStyle='#4a5938';
+  ctx.fillStyle=ch.shoulder;
   ctx.beginPath(); ctx.arc(-r*0.85,-r*0.1,r*0.42,0,Math.PI*2); ctx.fill();
   ctx.beginPath(); ctx.arc(r*0.85,-r*0.1,r*0.42,0,Math.PI*2); ctx.fill();
 
@@ -1846,18 +1925,32 @@ function drawSoldier(p){
   ctx.restore();
 
   // hands gripping the rifle
-  ctx.fillStyle='#2c3622';
+  ctx.fillStyle=ch.vest;
   ctx.beginPath(); ctx.arc(r*0.34, r*0.18, r*0.20, 0, Math.PI*2); ctx.fill(); // rear hand
   ctx.beginPath(); ctx.arc(r*0.34, -r*1.05, r*0.18, 0, Math.PI*2); ctx.fill(); // front hand
 
-  // helmet (head, on top)
-  ctx.fillStyle='#4a5938';
+  // head (helmet, or shark head)
+  ctx.fillStyle=ch.helmet;
   ctx.beginPath(); ctx.arc(0,-r*0.15,r*0.62,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#3d4a2f';
+  ctx.fillStyle=ch.helmet2;
   ctx.beginPath(); ctx.arc(0,-r*0.15,r*0.46,0,Math.PI*2); ctx.fill();
-  // helmet front brim
-  ctx.fillStyle='#2c3622';
-  ctx.beginPath(); ctx.ellipse(0,-r*0.55,r*0.5,r*0.22,0,0,Math.PI*2); ctx.fill();
+  if(ch.shark){
+    // shark snout + jagged white teeth at the front of the head
+    ctx.fillStyle=ch.helmet;
+    ctx.beginPath(); ctx.moveTo(-r*0.5,-r*0.45); ctx.lineTo(0,-r*0.95); ctx.lineTo(r*0.5,-r*0.45); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#0b0d18';
+    ctx.beginPath(); ctx.arc(-r*0.28,-r*0.18,r*0.1,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(r*0.28,-r*0.18,r*0.1,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#ffffff';
+    for(let i=-2;i<=2;i++){
+      const tx=i*r*0.16;
+      ctx.beginPath(); ctx.moveTo(tx-r*0.07,-r*0.42); ctx.lineTo(tx,-r*0.28); ctx.lineTo(tx+r*0.07,-r*0.42); ctx.closePath(); ctx.fill();
+    }
+  } else {
+    // helmet front brim
+    ctx.fillStyle=ch.brim;
+    ctx.beginPath(); ctx.ellipse(0,-r*0.55,r*0.5,r*0.22,0,0,Math.PI*2); ctx.fill();
+  }
 
   ctx.restore();
 }
@@ -1883,6 +1976,42 @@ function drawControls(){
   ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.fillText('⚔', a.x, a.y+2);
   ctx.textBaseline='alphabetic';
+}
+
+// ---- Nearest-enemy alert (Fortnite-style): reticle if on screen, edge arrow if off screen ----
+function nearestEnemyToPoint(px,py){
+  let best=null, bd=1e9;
+  for(const e of enemies){ const d=Math.hypot(e.x-px,e.y-py); if(d<bd){ bd=d; best=e; } }
+  return best;
+}
+function drawThreatIndicator(){
+  if(!settings.alert || state!=='play' || !localPlayer || localPlayer.out) return;
+  const e=nearestEnemyToPoint(localPlayer.x, localPlayer.y);
+  if(!e) return;
+  const ecx=(e.x-cam.x)*ZOOM, ecy=(e.y-cam.y)*ZOOM;
+  const pcx=(localPlayer.x-cam.x)*ZOOM, pcy=(localPlayer.y-cam.y)*ZOOM;
+  const pulse=0.55+0.45*Math.sin(performance.now()/140);
+  const base = e.melee ? '255,80,55' : (e.boss ? '255,60,120' : '255,180,60'); // red melee / pink boss / orange ranged
+  const onScreen = ecx>=0 && ecx<=W && ecy>=0 && ecy<=H;
+  if(onScreen){
+    // targeting reticle (corner brackets) locked on the nearest enemy
+    const r=(e.r||14)*ZOOM+9, g=r*0.5;
+    ctx.strokeStyle='rgba('+base+','+pulse+')'; ctx.lineWidth=2.5; ctx.lineCap='round';
+    ctx.beginPath();
+    ctx.moveTo(ecx-r,ecy-r+g); ctx.lineTo(ecx-r,ecy-r); ctx.lineTo(ecx-r+g,ecy-r);
+    ctx.moveTo(ecx+r-g,ecy-r); ctx.lineTo(ecx+r,ecy-r); ctx.lineTo(ecx+r,ecy-r+g);
+    ctx.moveTo(ecx+r,ecy+r-g); ctx.lineTo(ecx+r,ecy+r); ctx.lineTo(ecx+r-g,ecy+r);
+    ctx.moveTo(ecx-r+g,ecy+r); ctx.lineTo(ecx-r,ecy+r); ctx.lineTo(ecx-r,ecy+r-g);
+    ctx.stroke();
+  } else {
+    // off-screen: a warning arrow at the screen edge pointing toward the enemy
+    const ang=Math.atan2(ecy-pcy, ecx-pcx), m=36;
+    const bx=Math.max(m,Math.min(W-m,ecx)), by=Math.max(m,Math.min(H-m,ecy));
+    ctx.save(); ctx.translate(bx,by); ctx.rotate(ang);
+    ctx.fillStyle='rgba('+base+','+(0.55+0.45*pulse)+')';
+    ctx.beginPath(); ctx.moveTo(20,0); ctx.lineTo(-11,-13); ctx.lineTo(-5,0); ctx.lineTo(-11,13); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
 }
 
 // Render via requestAnimationFrame when the tab is visible.
@@ -1917,7 +2046,7 @@ function startGame(){
   ensureAudio(); // unlock audio on this user gesture
   netTeardown();
   startScreen.classList.add('hidden'); overScreen.classList.add('hidden'); lobbyScreen.classList.add('hidden');
-  pauseScreen.classList.add('hidden'); settingsScreen.classList.add('hidden');
+  pauseScreen.classList.add('hidden'); settingsScreen.classList.add('hidden'); charScreen.classList.add('hidden'); shopScreen.classList.add('hidden');
   hud.style.display='flex'; endmsg.style.fontSize='';
   score=0; addScore(0);
   resetLocalPlayer(); buildWorld(); startLevel(0); state='play';
@@ -1925,6 +2054,7 @@ function startGame(){
 function goToMenu(){
   overScreen.classList.add('hidden'); lobbyScreen.classList.add('hidden');
   pauseScreen.classList.add('hidden'); settingsScreen.classList.add('hidden');
+  charScreen.classList.add('hidden'); shopScreen.classList.add('hidden');
   hud.style.display='none'; bossWrap.classList.remove('show');
   startScreen.classList.remove('hidden'); state='menu';
 }
@@ -1987,7 +2117,7 @@ function hostCreateRoom(){
       updatePlayerList();
       lobbyStatus.textContent=net.conns.length+' friend(s) connected.';
     });
-    conn.on('data', d=>{ if(d&&d.t==='input'&&conn.gp){ conn.gp.input.mx=d.mx; conn.gp.input.my=d.my; conn.gp.input.atk=!!d.atk; } });
+    conn.on('data', d=>{ if(d&&d.t==='input'&&conn.gp){ conn.gp.input.mx=d.mx; conn.gp.input.my=d.my; conn.gp.input.atk=!!d.atk; if(d.ch&&CHARACTERS[d.ch]) conn.gp.char=d.ch; } });
     conn.on('close', ()=>hostDropConn(conn));
     conn.on('error', ()=>hostDropConn(conn));
   });
@@ -2052,7 +2182,7 @@ function buildSnapshot(){
     score, bossSpawned:!!bossSpawned, ov:(state==='over'?{win:lastWin}:null),
     bn:boss?boss.name:'', bhp:boss?boss.hp:0, bmax:boss?boss.maxHp:0,
     ec:enemies.filter(e=>!e.boss).length,
-    ps:players.map(p=>({id:p.id,n:p.name,c:p.color,x:Math.round(p.x),y:Math.round(p.y),a:+p.aim.toFixed(2),hp:Math.round(p.hp),mh:p.maxHp,sh:Math.round(p.shield||0),msh:p.maxShield||100,lv:p.lives,w:p.weapon,fl:p.flash,iv:p.invuln>0?1:0,o:p.out?1:0})),
+    ps:players.map(p=>({id:p.id,n:p.name,c:p.color,ch:p.char,x:Math.round(p.x),y:Math.round(p.y),a:+p.aim.toFixed(2),hp:Math.round(p.hp),mh:p.maxHp,sh:Math.round(p.shield||0),msh:p.maxShield||100,lv:p.lives,w:p.weapon,fl:p.flash,iv:p.invuln>0?1:0,o:p.out?1:0})),
     es:enemies.map(e=>({x:Math.round(e.x),y:Math.round(e.y),r:e.r,b:e.boss?1:0,c:e.color||'',hp:e.hp,mh:e.maxHp,sk:e.skin,m:e.melee?1:0})),
     bs:bullets.map(b=>({x:Math.round(b.x),y:Math.round(b.y),c:b.color})),
     eb:eBullets.map(b=>({x:Math.round(b.x),y:Math.round(b.y),c:b.color})),
@@ -2065,7 +2195,7 @@ function applySnapshot(s){
   bullets=s.bs.map(b=>({x:b.x,y:b.y,r:5,color:b.c}));
   eBullets=s.eb.map(b=>({x:b.x,y:b.y,r:5,color:b.c}));
   pickups=s.pk.map(p=>({x:p.x,y:p.y,r:16,kind:p.k,weapon:p.w,bob:0}));
-  players=s.ps.map(p=>({id:p.id,name:p.n,color:p.c,x:p.x,y:p.y,aim:p.a,hp:p.hp,maxHp:p.mh,shield:p.sh||0,maxShield:p.msh||100,lives:p.lv,weapon:p.w,flash:p.fl,invuln:p.iv?6:0,out:!!p.o,r:16,isLocal:p.id===net.myId}));
+  players=s.ps.map(p=>({id:p.id,name:p.n,color:p.c,char:p.ch||'soldier',x:p.x,y:p.y,aim:p.a,hp:p.hp,maxHp:p.mh,shield:p.sh||0,maxShield:p.msh||100,lives:p.lv,weapon:p.w,flash:p.fl,invuln:p.iv?6:0,out:!!p.o,r:16,isLocal:p.id===net.myId}));
   localPlayer=players.find(p=>p.isLocal)||localPlayer;
   if(localPlayer){
     player=localPlayer;
@@ -2101,7 +2231,7 @@ function sendInput(){
   const c=net.conns[0]; if(!c||!c.open) return;
   const now=performance.now(); if(now-net.lastInput<50) return; net.lastInput=now;
   const inp=readLocalInput();
-  try{ c.send({t:'input',mx:inp.mx,my:inp.my,atk:inp.atk}); }catch(e){}
+  try{ c.send({t:'input',mx:inp.mx,my:inp.my,atk:inp.atk,ch:selectedChar}); }catch(e){}
 }
 function clientUpdate(){
   sendInput();
@@ -2122,6 +2252,8 @@ function netTeardown(){
 document.getElementById('startBtn').onclick=startGame;
 document.getElementById('onlineBtn').onclick=openLobby;
 document.getElementById('armoryBtn').onclick=openShop;
+document.getElementById('charBtn').onclick=openChars;
+document.getElementById('charDoneBtn').onclick=closeChars;
 document.getElementById('shopBackBtn').onclick=closeShop;
 document.getElementById('pauseBtn').onclick=openPause;
 document.getElementById('resumeBtn').onclick=resumeGame;
