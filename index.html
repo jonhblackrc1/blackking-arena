@@ -686,24 +686,26 @@ function buildWorld(){
   const rnd=(a,b)=>a+Math.random()*(b-a);
   const cx=MAP_W/2, cy=MAP_H/2;
   // ground decals first (drawn flat under everything)
-  for(let i=0;i<55;i++) decor.push({type:'crack', x:rnd(0,MAP_W), y:rnd(0,MAP_H), len:rnd(40,150), a:rnd(0,Math.PI), w:rnd(1,2.5)});
-  for(let i=0;i<26;i++) decor.push({type:'dust',  x:rnd(80,MAP_W-80), y:rnd(80,MAP_H-80), r:rnd(45,120), rot:rnd(0,6.28), dark:Math.random()<0.5});
+  for(let i=0;i<28;i++) decor.push({type:'crack', x:rnd(0,MAP_W), y:rnd(0,MAP_H), len:rnd(40,150), a:rnd(0,Math.PI), w:rnd(1,2.5)});
+  for(let i=0;i<13;i++) decor.push({type:'dust',  x:rnd(80,MAP_W-80), y:rnd(80,MAP_H-80), r:rnd(45,120), rot:rnd(0,6.28), dark:Math.random()<0.5});
   // impact craters (flat on the ground)
   const away=(min)=>{ let x,y; do{ x=rnd(140,MAP_W-140); y=rnd(140,MAP_H-140);}while(Math.hypot(x-cx,y-cy)<min); return {x,y}; };
-  for(let i=0;i<14;i++){ const p=away(280); decor.push({type:'crater', x:p.x, y:p.y, r:rnd(34,92), seed:Math.random()}); }
+  for(let i=0;i<7;i++){ const p=away(280); decor.push({type:'crater', x:p.x, y:p.y, r:rnd(34,92), seed:Math.random()}); }
   // martian boulders/rocks (the main scenery)
-  for(let i=0;i<42;i++){ const p=away(170); decor.push({type:'rock', x:p.x, y:p.y, r:rnd(10,36), seed:Math.random()}); }
+  for(let i=0;i<21;i++){ const p=away(170); decor.push({type:'rock', x:p.x, y:p.y, r:rnd(10,36), seed:Math.random()}); }
   // a few rusted colony ruins
-  for(let i=0;i<8;i++){ const p=away(420); decor.push({type:'building', x:p.x, y:p.y, w:rnd(90,200), h:rnd(90,200), seed:Math.random()}); }
+  for(let i=0;i<4;i++){ const p=away(420); decor.push({type:'building', x:p.x, y:p.y, w:rnd(90,200), h:rnd(90,200), seed:Math.random()}); }
   // draw order: flat decals first, then standing props sorted by y for fake depth
   const flat=t=>(t==='crack'||t==='dust'||t==='crater')?0:1;
   decor.sort((a,b)=>{ const ga=flat(a.type), gb=flat(b.type); return ga!==gb ? ga-gb : a.y-b.y; });
 }
 
-function startLevel(idx){
+function startLevel(idx, fresh){
   level=idx;
   const cfg=LEVELS[idx];
-  enemies=[]; bullets=[]; eBullets=[]; particles=[]; pickups=[];
+  enemies=[]; bullets=[]; eBullets=[]; particles=[];
+  // weapons stay on the map between rounds; a brand-new game starts clean
+  pickups = fresh ? [] : pickups.filter(p=>p.kind==='weapon');
   boss=null; bossSpawned=false;
   // place all players near the centre (spread in a small ring), refill their health
   players.forEach((p,i)=>{
@@ -734,18 +736,18 @@ function startLevel(idx){
     }
   }
   // weapon pickups: one or two random weapons spread around the map
-  const wCount = 4; // 4 weapons per round (was 2)
+  const wCount = 2; // weapons per round, halved (they persist on the map now)
   for(let i=0;i<wCount;i++){
     const wk=randomWeaponKey();
     pickups.push(spawnPickup('weapon', wk));
   }
   // health pickups
-  const hCount = 2; // health pickups halved per round (was 3)
+  const hCount = 1; // health pickups halved per round
   for(let i=0;i<hCount;i++){
     pickups.push(spawnPickup('health', null));
   }
   // shield-vest pickups (grant shield, which absorbs damage before health)
-  const sCount = 1; // shield pickups halved per round (was 2)
+  const sCount = 1; // shield pickups (1 per round)
   for(let i=0;i<sCount;i++){
     pickups.push(spawnPickup('shield', null));
   }
@@ -1087,7 +1089,7 @@ function update(){
       for(const p of players){
         if(p.out) continue;
         if(Math.hypot(pk.x-p.x,pk.y-p.y) < pk.r+p.r){
-          if(pk.kind==='health'){ p.hp=Math.min(p.maxHp,p.hp+40); spawnParticles(pk.x,pk.y,'#5aff8a',16); if(p.isLocal) showToast('+40 HP'); }
+          if(pk.kind==='health'){ p.hp=Math.min(p.maxHp,p.hp+40); spawnParticles(pk.x,pk.y,'#ffffff',16); if(p.isLocal) showToast('+40 HP'); }
           else if(pk.kind==='shield'){ p.shield=Math.min(p.maxShield,(p.shield||0)+50); spawnParticles(pk.x,pk.y,'#5ad1ff',16); if(p.isLocal) showToast('+50 SHIELD'); }
           else if(pk.kind==='weapon'){ p.weapon=pk.weapon; spawnParticles(pk.x,pk.y,WEAPONS[pk.weapon].color,16); if(p.isLocal) showToast(WEAPONS[pk.weapon].name+'!'); }
           if(p.isLocal){ sfx('pickup'); haptic(15); }
@@ -1398,7 +1400,7 @@ function render(){
       // hp pip
       if(e.hp<e.maxHp){
         ctx.fillStyle='#22182f'; ctx.fillRect(e.x-cam.x-12,e.y-cam.y-e.r-12,24,4);
-        ctx.fillStyle='#7dff5a'; ctx.fillRect(e.x-cam.x-12,e.y-cam.y-e.r-12,24*(e.hp/e.maxHp),4);
+        ctx.fillStyle='#ffd24d'; ctx.fillRect(e.x-cam.x-12,e.y-cam.y-e.r-12,24*(e.hp/e.maxHp),4);
       }
     }
   }
@@ -1459,12 +1461,12 @@ function drawAlien(e){
   const x=e.x-cam.x, y=e.y-cam.y, r=e.r;
   const wob=Math.sin(e.wob)*1.5;
   const melee = e.melee;
-  // ranged = green; melee = aggressive red/orange
-  const cGlow = melee ? '#ff6a3a' : '#7dff5a';
-  const cLeg  = melee ? '#b83a22' : '#3fae3a';
-  const cBody = melee ? '#e8463a' : '#5ad14a';
-  const cSheen= melee ? '#ff7a5a' : '#6fe85c';
-  const cPup  = melee ? '#ffd24d' : '#7dff5a';
+  // ranged = alien violet; melee = aggressive red/orange (no green — Mars theme)
+  const cGlow = melee ? '#ff6a3a' : '#b06af0';
+  const cLeg  = melee ? '#b83a22' : '#6a36a8';
+  const cBody = melee ? '#e8463a' : '#9b5ad1';
+  const cSheen= melee ? '#ff7a5a' : '#b884ea';
+  const cPup  = melee ? '#ffd24d' : '#e0c0ff';
   ctx.save();
   ctx.translate(x,y);
 
@@ -1761,8 +1763,8 @@ function drawPickup(pk){
   ctx.translate(x,y);
 
   if(pk.kind==='health'){
-    // glowing medkit
-    ctx.globalAlpha=0.25; ctx.fillStyle='#5aff8a';
+    // glowing medkit (white glow — no green on Mars)
+    ctx.globalAlpha=0.25; ctx.fillStyle='#ffffff';
     ctx.beginPath(); ctx.arc(0,0,pk.r+8,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
     // white case
     ctx.fillStyle='#f2f5f0';
@@ -2142,7 +2144,7 @@ function startGame(){
   pauseScreen.classList.add('hidden'); settingsScreen.classList.add('hidden'); charScreen.classList.add('hidden'); shopScreen.classList.add('hidden');
   hud.style.display='flex'; endmsg.style.fontSize='';
   score=0; addScore(0);
-  resetLocalPlayer(); buildWorld(); startLevel(0); state='play';
+  resetLocalPlayer(); buildWorld(); startLevel(0, true); state='play';
 }
 function goToMenu(){
   overScreen.classList.add('hidden'); lobbyScreen.classList.add('hidden');
@@ -2161,7 +2163,7 @@ function coopRestart(){
   overScreen.classList.add('hidden'); hud.style.display='flex';
   score=0; addScore(0);
   for(const p of players){ p.out=false; p.dead=false; p.lives=1; p.hp=p.maxHp; p.weapon='pistol'; }
-  buildWorld(); sendWorldToAll(); startLevel(0); state='play';
+  buildWorld(); sendWorldToAll(); startLevel(0, true); state='play';
 }
 
 // ---- Lobby navigation ----
@@ -2226,7 +2228,7 @@ function hostStartCoop(){
   closeLobby(); hud.style.display='flex';
   score=0; addScore(0);
   startCoopBtn.classList.add('hidden');
-  startLevel(0); state='play';
+  startLevel(0, true); state='play';
 }
 function sendWorldToAll(){ for(const c of net.conns){ try{ c.send({t:'world', decor, started:true}); }catch(e){} } }
 
