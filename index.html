@@ -144,11 +144,12 @@
     <button class="btn" id="startBtn">PLAY</button>
   </div>
   <button class="btn btn-alt" id="charBtn" style="margin-top:14px">🦸 CHARACTER</button>
+  <button class="btn btn-alt" id="weaponShopBtn" style="margin-top:10px">🔫 ARMAS</button>
   <button class="btn btn-alt" id="armoryBtn" style="margin-top:10px">⚙ ARMORY · UPGRADES</button>
   <div class="info">
     <b>Joystick</b> (left): drag to move your character in any direction.<br>
-    <b>⚔ Button</b> (right): hold to fire at the nearest enemy.<br>
-    <b>Keyboard</b> (PC): WASD / Arrows to move · Space to attack.<br>
+    <b>⚔ Joystick</b> (right): drag to aim and auto-fire. Hold to keep firing.<br>
+    <b>Keyboard</b> (PC): WASD / Arrows to move · Mouse aim & click to fire.<br>
     Dodge the plasma and defeat the alien boss of each level.
   </div>
 </div>
@@ -220,9 +221,18 @@
 <div class="overlay hidden" id="shopScreen">
   <div class="title" style="font-size:clamp(26px,7vw,48px)">⚙ ARMORY</div>
   <div class="sub" id="shopMoney" style="margin-top:6px;color:#ffd24d;font-weight:bold">🪙 0 COINS</div>
-  <div class="info" style="margin:6px 0 2px">Earn coins each run (33% of your score) and upgrade your weapons.</div>
+  <div class="info" style="margin:6px 0 2px">Gana 5 monedas por nivel completado. Mejora tus armas.</div>
   <div id="shopList"></div>
   <button class="btn btn-alt" id="shopBackBtn" style="margin-top:16px">← BACK</button>
+</div>
+
+<!-- ===== Weapon Shop / ARMAS ===== -->
+<div class="overlay hidden" id="weaponShopScreen">
+  <div class="title" style="font-size:clamp(26px,7vw,48px)">🔫 ARMAS</div>
+  <div class="sub" id="weaponShopMoney" style="margin-top:6px;color:#ffd24d;font-weight:bold">🪙 0 MONEDAS</div>
+  <div class="info" style="margin:4px 0 2px">Compra y equipa tu arma antes de entrar al combate.</div>
+  <div id="weaponShopList" style="width:min(92vw,430px);margin-top:4px;overflow-y:auto;max-height:55vh"></div>
+  <button class="btn btn-alt" id="weaponShopBackBtn" style="margin-top:14px">← VOLVER</button>
 </div>
 
 <!-- ===== In-game pause menu ===== -->
@@ -371,6 +381,20 @@ function randomWeaponKey(){
 const GOLDEN_WEAPONS=['scar','goldshotgun'];
 function isGoldenWeapon(k){ return GOLDEN_WEAPONS.indexOf(k)>=0; }
 
+// ---- Weapon shop prices (coins) ----
+const WEAPON_PRICES={pistol:0, rifle:50, ak:100, shotgun:75, smg:80, scar:300, goldshotgun:350};
+
+// ---- Owned / equipped weapon persistence ----
+let ownedWeapons=(function(){
+  try{ const a=JSON.parse(localStorage.getItem('bk_owned_weapons')||'["pistol"]');
+    return Array.isArray(a)?a:['pistol']; }catch(e){ return ['pistol']; }
+})();
+let equippedWeapon=localStorage.getItem('bk_equipped_weapon')||'pistol';
+if(!WEAPONS[equippedWeapon]||!ownedWeapons.includes(equippedWeapon)){ equippedWeapon='pistol'; }
+if(!ownedWeapons.includes('pistol')) ownedWeapons.push('pistol');
+function saveOwnedWeapons(){ try{ localStorage.setItem('bk_owned_weapons',JSON.stringify(ownedWeapons)); }catch(e){} }
+function saveEquippedWeapon(){ try{ localStorage.setItem('bk_equipped_weapon',equippedWeapon); }catch(e){} }
+
 // ---- Weapon upgrades (bought in the ARMORY with coins) ----
 // Each weapon has 2 upgrade tracks; each level adds 'per' to a stat. Coins come from runs.
 const UPGRADES={
@@ -443,7 +467,7 @@ function makePlayer(id,isLocal,colorIdx,name){
     char: isLocal ? selectedChar : 'soldier',
     x:MAP_W/2, y:MAP_H/2, r:16, hp:100, maxHp:100, speed:4.52, fireCD:0, dmg:1, /* 3.4 * 1.33 → 33% faster */
     shield:0, maxShield:100, /* absorbs damage before health; only gained from shield vests */
-    dead:false, out:false, lives:1, invuln:0, aim:-Math.PI/2, flash:0, weapon:'pistol',
+    dead:false, out:false, lives:1, invuln:0, aim:-Math.PI/2, flash:0, weapon:isLocal?(equippedWeapon||'pistol'):'pistol',
     input:{mx:0,my:0,atk:false}};
 }
 function resetLocalPlayer(){
@@ -601,6 +625,95 @@ function buyUpgrade(weapon, track){
 }
 function openShop(){ startScreen.classList.add('hidden'); shopScreen.classList.remove('hidden'); renderShop(); }
 function closeShop(){ shopScreen.classList.add('hidden'); startScreen.classList.remove('hidden'); }
+
+// ---- Weapon shop (buy / equip) ----
+const weaponShopScreen=document.getElementById('weaponShopScreen');
+const weaponShopList=document.getElementById('weaponShopList');
+const weaponShopMoney=document.getElementById('weaponShopMoney');
+const WEAPON_SHOP_ORDER=['pistol','rifle','ak','shotgun','smg','scar','goldshotgun'];
+
+function drawWeaponPreview(canvas, key){
+  const pc=canvas.getContext('2d');
+  const cw=canvas.width, ch=canvas.height;
+  pc.clearRect(0,0,cw,ch);
+  if(isGoldenWeapon(key)){
+    pc.globalAlpha=0.22; pc.fillStyle='#ffd24d';
+    pc.beginPath(); pc.arc(cw/2,ch/2,22,0,Math.PI*2); pc.fill(); pc.globalAlpha=1;
+  }
+  pc.save();
+  pc.translate(cw/2, ch/2);
+  drawWeaponIcon(key, isGoldenWeapon(key)?20:16, WEAPONS[key].color, pc);
+  pc.restore();
+}
+
+function renderWeaponShop(){
+  if(weaponShopMoney) weaponShopMoney.textContent='🪙 '+money+' MONEDAS';
+  let html='';
+  for(const key of WEAPON_SHOP_ORDER){
+    const w=WEAPONS[key], price=WEAPON_PRICES[key];
+    const owned=ownedWeapons.includes(key), equipped=equippedWeapon===key;
+    const canBuy=!owned&&money>=price, gold=isGoldenWeapon(key);
+    html+='<div class="wcard" style="'+(gold?'border-color:rgba(255,210,77,0.5);background:rgba(255,210,77,0.05);':'')+'">'+
+      '<div style="display:flex;align-items:center;gap:10px">'+
+        '<canvas id="wpr_'+key+'" width="90" height="56" style="border-radius:8px;flex-shrink:0;background:'+(gold?'#1e1a08':'#141220')+'"></canvas>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div class="wname" style="'+(gold?'color:#ffd24d':'')+'">'+escapeHtml(w.name)+'</div>'+
+          '<div style="font-size:11px;color:#9b94c4;margin-top:3px;line-height:1.7">'+
+            'DMG <b style="color:#f5d77a">'+w.dmg.toFixed(1)+'</b> &nbsp;'+
+            'RATE <b style="color:#caa3ff">'+w.fireRate+'</b> &nbsp;'+
+            'BALAS <b style="color:#5ad1ff">'+w.pellets+'</b>'+
+            (w.pierce?'&nbsp; PIERCE <b style="color:#ff9d4d">'+w.pierce+'</b>':'')+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+      '<div style="display:flex;gap:8px;margin-top:8px;align-items:center;justify-content:space-between">'+
+        (equipped
+          ? '<span style="color:#5aff8a;font-weight:bold;font-size:13px;letter-spacing:1px">✓ EQUIPADA</span><span></span>'
+          : owned
+            ? '<span></span><button class="ubuy" data-equip="'+key+'">EQUIPAR</button>'
+            : (price===0
+                ? '<span></span><button class="ubuy" data-buy="'+key+'">GRATIS</button>'
+                : '<span style="font-size:12px;color:'+(canBuy?'#ffd24d':'#7d77a3')+'">🪙 '+price+'</span>'+
+                  '<button class="ubuy'+(canBuy?'':' off')+'" data-buy="'+key+'"'+(canBuy?'':' disabled')+'>COMPRAR</button>'
+              )
+        )+
+      '</div>'+
+    '</div>';
+  }
+  weaponShopList.innerHTML=html;
+  for(const key of WEAPON_SHOP_ORDER){
+    const c=document.getElementById('wpr_'+key);
+    if(c) drawWeaponPreview(c,key);
+  }
+  weaponShopList.querySelectorAll('[data-buy]').forEach(b=>{
+    b.onclick=()=>buyWeapon(b.getAttribute('data-buy'));
+  });
+  weaponShopList.querySelectorAll('[data-equip]').forEach(b=>{
+    b.onclick=()=>equipWeapon(b.getAttribute('data-equip'));
+  });
+}
+
+function buyWeapon(key){
+  if(ownedWeapons.includes(key)) return;
+  const price=WEAPON_PRICES[key];
+  if(price>0&&money<price){ showToast('SIN FONDOS'); return; }
+  money=Math.max(0,money-price); saveMoney();
+  if(!ownedWeapons.includes(key)) ownedWeapons.push(key);
+  saveOwnedWeapons();
+  equipWeapon(key);
+}
+
+function equipWeapon(key){
+  if(!ownedWeapons.includes(key)) return;
+  equippedWeapon=key; saveEquippedWeapon();
+  if(player&&player.isLocal) player.weapon=key;
+  sfx('pickup');
+  renderWeaponShop();
+  updateMenuHiscore();
+}
+
+function openWeaponShop(){ startScreen.classList.add('hidden'); weaponShopScreen.classList.remove('hidden'); renderWeaponShop(); }
+function closeWeaponShop(){ weaponShopScreen.classList.add('hidden'); startScreen.classList.remove('hidden'); }
 
 // ---- Character select ----
 const charScreen=document.getElementById('charScreen');
@@ -776,8 +889,7 @@ function startLevel(idx, fresh){
   level=idx;
   const cfg=LEVELS[idx];
   enemies=[]; bullets=[]; eBullets=[]; particles=[]; missiles=[];
-  // weapons stay on the map between rounds; a brand-new game starts clean
-  pickups = fresh ? [] : pickups.filter(p=>p.kind==='weapon');
+  pickups = []; // health/shield only — no weapon drops
   boss=null; bossSpawned=false;
   // place all players near the centre (spread in a small ring), refill their health
   players.forEach((p,i)=>{
@@ -806,12 +918,6 @@ function startLevel(idx, fresh){
       enemies.push({x,y,r:13,hp:rhp,maxHp:rhp,speed:cfg.espeed,shoot:cfg.eShoot,
                     boss:false,melee:false,strafe:(Math.random()<0.5?1:-1),fireCD:Math.random()*100});
     }
-  }
-  // weapon pickups: one or two random weapons spread around the map
-  const wCount = 2; // weapons per round, halved (they persist on the map now)
-  for(let i=0;i<wCount;i++){
-    const wk=randomWeaponKey();
-    pickups.push(spawnPickup('weapon', wk));
   }
   // health pickups
   const hCount = 1; // health pickups halved per round
@@ -867,31 +973,21 @@ function updateHUD(){
   if(boss) bossfill.style.width=Math.max(0,boss.hp/boss.maxHp*100)+'%';
 }
 
-// ---- On-screen controls (joystick + attack) ----
-let touches={}; // id -> {x,y}
+// ---- On-screen controls (move joystick left + aim joystick right) ----
 let moveVec={x:0,y:0};
-let attackHeld=false;
 let joy={active:false,id:null,cx:0,cy:0,dx:0,dy:0};
+let aimJoy={active:false,id:null,cx:0,cy:0,dx:0,dy:0};
 const JOY_R=70;
+const AIM_JOY_R=70;
+// PC mouse aim
+let mouseScreenX=0, mouseScreenY=0, mouseFireHeld=false;
 
 function controlLayout(){
   const pad=22;
-  const btn=Math.max(46,Math.min(62,W*0.085));
   return {
-    btn,
-    joyHome:{ x: pad+JOY_R+10, y: H-pad-JOY_R-10, r:JOY_R },
-    attack:{ x: W-pad-btn*1.2, y: H-pad-btn*1.4, r: btn*1.25 }
+    joyHome:{ x: pad+JOY_R+10,       y: H-pad-JOY_R-10 },
+    aimHome:{ x: W-pad-AIM_JOY_R-10, y: H-pad-AIM_JOY_R-10 }
   };
-}
-function pointInCircle(px,py,cx,cy,r){ return (px-cx)**2+(py-cy)**2 <= r*r; }
-
-function recomputeControls(){
-  const L=controlLayout();
-  attackHeld=false;
-  for(const id in touches){
-    const t=touches[id];
-    if(pointInCircle(t.x,t.y,L.attack.x,L.attack.y,L.attack.r)) attackHeld=true;
-  }
 }
 
 function applyJoy(x,y){
@@ -900,22 +996,26 @@ function applyJoy(x,y){
   joy.dx=dx; joy.dy=dy;
   moveVec.x=dx/JOY_R; moveVec.y=dy/JOY_R;
 }
+function applyAimJoy(x,y){
+  let dx=x-aimJoy.cx, dy=y-aimJoy.cy, m=Math.hypot(dx,dy);
+  if(m>AIM_JOY_R){ dx=dx/m*AIM_JOY_R; dy=dy/m*AIM_JOY_R; }
+  aimJoy.dx=dx; aimJoy.dy=dy;
+}
 function pressPoint(id,x,y){
   if(x < W*0.5 && !joy.active){
-    // start joystick where finger lands (within left half)
     joy.active=true; joy.id=id; joy.cx=x; joy.cy=y; joy.dx=0; joy.dy=0;
     moveVec.x=0; moveVec.y=0;
-  } else {
-    touches[id]={x,y}; recomputeControls();
+  } else if(x >= W*0.5 && !aimJoy.active){
+    aimJoy.active=true; aimJoy.id=id; aimJoy.cx=x; aimJoy.cy=y; aimJoy.dx=0; aimJoy.dy=0;
   }
 }
 function movePoint(id,x,y){
   if(joy.active && joy.id===id) applyJoy(x,y);
-  else if(touches[id]){ touches[id]={x,y}; recomputeControls(); }
+  else if(aimJoy.active && aimJoy.id===id) applyAimJoy(x,y);
 }
 function releasePoint(id){
   if(joy.active && joy.id===id){ joy.active=false; joy.id=null; joy.dx=0; joy.dy=0; moveVec.x=0; moveVec.y=0; }
-  else { delete touches[id]; recomputeControls(); }
+  else if(aimJoy.active && aimJoy.id===id){ aimJoy.active=false; aimJoy.id=null; aimJoy.dx=0; aimJoy.dy=0; }
 }
 
 canvas.addEventListener('touchstart',e=>{
@@ -935,10 +1035,10 @@ canvas.addEventListener('touchcancel',e=>{
   for(const t of e.changedTouches) releasePoint(t.identifier);
 },{passive:false});
 
-// Mouse fallback (desktop)
-canvas.addEventListener('mousedown',e=>{ pressPoint('m',e.clientX,e.clientY); });
-window.addEventListener('mousemove',e=>{ movePoint('m',e.clientX,e.clientY); });
-window.addEventListener('mouseup',e=>{ releasePoint('m'); });
+// Mouse (desktop): track position for aim, click to fire
+canvas.addEventListener('mousemove',e=>{ mouseScreenX=e.clientX; mouseScreenY=e.clientY; });
+canvas.addEventListener('mousedown',e=>{ if(e.button===0){ mouseFireHeld=true; ensureAudio(); } });
+window.addEventListener('mouseup',e=>{ if(e.button===0) mouseFireHeld=false; });
 // ---- Keyboard controls (desktop): WASD / arrows = move, Space (or K) = attack ----
 const keys={};
 const GAME_KEYS=['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',' ','k'];
@@ -1008,7 +1108,9 @@ function readLocalInput(){
   if(keys['s']||keys['arrowdown'])my+=1;
   if(keys['a']||keys['arrowleft'])mx-=1;
   if(keys['d']||keys['arrowright'])mx+=1;
-  return {mx,my, atk: attackHeld||keys[' ']||keys['k']};
+  const aimJoyActive = aimJoy.active && Math.hypot(aimJoy.dx,aimJoy.dy)>8;
+  const atk = aimJoyActive || mouseFireHeld || keys[' '] || keys['k'];
+  return {mx,my,atk};
 }
 
 // ---- Update ----
@@ -1026,28 +1128,33 @@ function update(){
       if(mm>0){ nmx/=mm; nmy/=mm; moveColliding(p, nmx*p.speed, nmy*p.speed); }
       p.x=Math.max(p.r,Math.min(MAP_W-p.r,p.x));
       p.y=Math.max(p.r,Math.min(MAP_H-p.r,p.y));
-      // shoot nearest enemy in range
-      p.fireCD--;
-      if(p.fireCD<=0 && inp.atk){
-        const tgt=nearestEnemyTo(p);
-        if(tgt){
-          const w=effectiveWeapon(p.weapon);
-          const base=Math.atan2(tgt.y-p.y,tgt.x-p.x);
-          for(let k=0;k<w.pellets;k++){
-            const off = w.pellets>1 ? (k-(w.pellets-1)/2)*(w.spread/Math.max(1,w.pellets-1)) : 0;
-            const a = base + off + (Math.random()-0.5)*(w.spread*0.15);
-            bullets.push({x:p.x,y:p.y,vx:Math.cos(a)*w.speed,vy:Math.sin(a)*w.speed,
-              r:w.bulletR||5, dmg:w.dmg, life:w.bulletLife||80, color:w.color,
-              pierce:w.pierce, special:w.special, hitList:w.pierce?[]:null});
-          }
-          p.fireCD=w.fireRate; p.flash=5;
-          if(p.isLocal) sfx('shoot');
+      // manual aim: local player uses mouse or right joystick; remote players use snapshot/network aim
+      if(p.isLocal){
+        const aimJoyActive = aimJoy.active && Math.hypot(aimJoy.dx,aimJoy.dy)>8;
+        if(aimJoyActive){
+          p.aim=Math.atan2(aimJoy.dy,aimJoy.dx);
+        } else {
+          const wx=cam.x+mouseScreenX/ZOOM, wy=cam.y+mouseScreenY/ZOOM;
+          const adx=wx-p.x, ady=wy-p.y;
+          if(Math.hypot(adx,ady)>12) p.aim=Math.atan2(ady,adx);
+          else if(mm>0) p.aim=Math.atan2(nmy,nmx);
         }
       }
-      // aim: face nearest enemy, else movement direction
-      const at=nearestEnemyTo(p);
-      if(at) p.aim=Math.atan2(at.y-p.y,at.x-p.x);
-      else if(mm>0) p.aim=Math.atan2(nmy,nmx);
+      // shoot in aim direction (manual — no target required)
+      p.fireCD--;
+      if(p.fireCD<=0 && inp.atk){
+        const w=effectiveWeapon(p.weapon);
+        const base=p.aim;
+        for(let k=0;k<w.pellets;k++){
+          const off = w.pellets>1 ? (k-(w.pellets-1)/2)*(w.spread/Math.max(1,w.pellets-1)) : 0;
+          const a = base + off + (Math.random()-0.5)*(w.spread*0.15);
+          bullets.push({x:p.x,y:p.y,vx:Math.cos(a)*w.speed,vy:Math.sin(a)*w.speed,
+            r:w.bulletR||5, dmg:w.dmg, life:w.bulletLife||80, color:w.color,
+            pierce:w.pierce, special:w.special, hitList:w.pierce?[]:null});
+        }
+        p.fireCD=w.fireRate; p.flash=5;
+        if(p.isLocal) sfx('shoot');
+      }
       if(p.flash>0)p.flash--;
       if(p.invuln>0)p.invuln--;
     }
@@ -1208,6 +1315,8 @@ function update(){
 
 function levelClear(){
   addScore(500*(level+1)); // level-clear bonus, grows each level
+  money+=5; saveMoney(); updateMenuHiscore();
+  showToast('+5 ORO');
   if(level+1>=LEVELS.length){ gameOver(true); }
   else {
     state='transition';
@@ -1226,15 +1335,12 @@ function gameOver(win){
   // save the high score
   const isRecord = score>highScore;
   if(isRecord){ highScore=score; localStorage.setItem('bk_highscore', String(highScore)); }
-  // earn coins for the ARMORY: 33% of the run's score
-  const earned = Math.floor(score*0.33);
-  money += earned; saveMoney();
   updateMenuHiscore();
   const scoreLine =
     '<div style="margin-top:14px;font-size:clamp(20px,6vw,30px);color:#f5d77a;font-weight:900">SCORE: '+score+'</div>'+
     '<div style="margin-top:4px;font-size:clamp(13px,3.5vw,16px);color:#caa3ff">'+
       (isRecord ? '★ NEW HIGH SCORE! ★' : 'HIGH SCORE: '+highScore)+'</div>'+
-    '<div style="margin-top:6px;font-size:clamp(15px,4vw,20px);color:#ffd24d;font-weight:bold">+ '+earned+' COINS  ·  TOTAL '+money+'</div>';
+    '<div style="margin-top:6px;font-size:clamp(15px,4vw,20px);color:#ffd24d;font-weight:bold">🪙 TOTAL: '+money+' MONEDAS</div>';
   if(win){
     endmsg.textContent='VICTORY!';
     endmsg.style.fontSize='clamp(34px,10vw,72px)';
@@ -1900,55 +2006,52 @@ function drawPickup(pk){
   ctx.restore();
 }
 
-function drawWeaponIcon(type, r, color){
-  ctx.save();
-  ctx.scale(r/16, r/16); // icons designed for r=16
-  ctx.fillStyle='#e8e6f5';
+function drawWeaponIcon(type, r, color, c){
+  if(!c) c=ctx;
+  c.save();
+  c.scale(r/16, r/16);
+  c.fillStyle='#e8e6f5';
   if(type==='rifle'){
-    ctx.fillRect(-12,-2,22,5);     // long barrel
-    ctx.fillStyle=color; ctx.fillRect(8,-3,4,7); // muzzle
-    ctx.fillStyle='#9a9aa8'; ctx.fillRect(-6,2,5,6); // mag
-    ctx.fillRect(-12,1,4,5); // stock
+    c.fillRect(-12,-2,22,5);
+    c.fillStyle=color; c.fillRect(8,-3,4,7);
+    c.fillStyle='#9a9aa8'; c.fillRect(-6,2,5,6);
+    c.fillRect(-12,1,4,5);
   } else if(type==='ak'){
-    // AK-47: light receiver + wood stock + curved banana magazine (visible on the dark crate)
-    ctx.fillStyle='#e8e6f5'; ctx.fillRect(-12,-2,23,5);     // receiver/barrel (light)
-    ctx.fillStyle=color;     ctx.fillRect(9,-3,4,7);        // muzzle (AK orange/wood)
-    ctx.fillStyle='#b97a34'; ctx.fillRect(-13,1,6,5);       // wood stock
-    // curved banana magazine
-    ctx.fillStyle='#c8783c';
-    ctx.beginPath(); ctx.moveTo(-4,3); ctx.lineTo(3,3); ctx.lineTo(7,12); ctx.lineTo(0,12); ctx.closePath(); ctx.fill();
+    c.fillStyle='#e8e6f5'; c.fillRect(-12,-2,23,5);
+    c.fillStyle=color;     c.fillRect(9,-3,4,7);
+    c.fillStyle='#b97a34'; c.fillRect(-13,1,6,5);
+    c.fillStyle='#c8783c';
+    c.beginPath(); c.moveTo(-4,3); c.lineTo(3,3); c.lineTo(7,12); c.lineTo(0,12); c.closePath(); c.fill();
   } else if(type==='shotgun'){
-    ctx.fillRect(-12,-3,20,4);     // top barrel
-    ctx.fillRect(-12,1,20,4);      // bottom barrel
-    ctx.fillStyle=color; ctx.fillRect(7,-4,4,9);
-    ctx.fillStyle='#7a5230'; ctx.fillRect(-13,-2,5,8); // wood stock
+    c.fillRect(-12,-3,20,4);
+    c.fillRect(-12,1,20,4);
+    c.fillStyle=color; c.fillRect(7,-4,4,9);
+    c.fillStyle='#7a5230'; c.fillRect(-13,-2,5,8);
   } else if(type==='smg'){
-    ctx.fillRect(-8,-2,16,5);
-    ctx.fillStyle=color; ctx.fillRect(6,-3,4,6);
-    ctx.fillStyle='#9a9aa8'; ctx.fillRect(-3,2,4,8); // long mag
-    ctx.fillRect(-9,1,3,4);
+    c.fillRect(-8,-2,16,5);
+    c.fillStyle=color; c.fillRect(6,-3,4,6);
+    c.fillStyle='#9a9aa8'; c.fillRect(-3,2,4,8);
+    c.fillRect(-9,1,3,4);
   } else if(type==='scar'){
-    // GOLDEN SCAR — a big all-gold assault rifle
-    ctx.fillStyle='#ffd24d';
-    ctx.fillRect(-13,-2.5,25,6);          // long barrel/receiver
-    ctx.fillStyle='#fff0b0'; ctx.fillRect(7,-3.5,7,8);  // bright muzzle
-    ctx.fillStyle='#c79a2c'; ctx.fillRect(-8,2.5,7,8);  // curved mag
-    ctx.fillStyle='#ffd24d'; ctx.fillRect(-14,0.5,6,7); // stock
-    ctx.fillStyle='#fff6cf'; ctx.fillRect(-5,-1.5,12,2); // top rail highlight
+    c.fillStyle='#ffd24d';
+    c.fillRect(-13,-2.5,25,6);
+    c.fillStyle='#fff0b0'; c.fillRect(7,-3.5,7,8);
+    c.fillStyle='#c79a2c'; c.fillRect(-8,2.5,7,8);
+    c.fillStyle='#ffd24d'; c.fillRect(-14,0.5,6,7);
+    c.fillStyle='#fff6cf'; c.fillRect(-5,-1.5,12,2);
   } else if(type==='goldshotgun'){
-    // GOLDEN SHOTGUN — all-gold double-barrel
-    ctx.fillStyle='#ffd24d';
-    ctx.fillRect(-13,-3.5,23,4.5);        // top barrel
-    ctx.fillRect(-13,1,23,4.5);           // bottom barrel
-    ctx.fillStyle='#fff0b0'; ctx.fillRect(8,-4.5,6,10); // bright muzzles
-    ctx.fillStyle='#c79a2c'; ctx.fillRect(-14,-2.5,6,9); // golden stock
-    ctx.fillStyle='#fff6cf'; ctx.fillRect(-6,-2.5,12,1.5); // rib highlight
+    c.fillStyle='#ffd24d';
+    c.fillRect(-13,-3.5,23,4.5);
+    c.fillRect(-13,1,23,4.5);
+    c.fillStyle='#fff0b0'; c.fillRect(8,-4.5,6,10);
+    c.fillStyle='#c79a2c'; c.fillRect(-14,-2.5,6,9);
+    c.fillStyle='#fff6cf'; c.fillRect(-6,-2.5,12,1.5);
   } else { // pistol
-    ctx.fillRect(-6,-2,12,4);
-    ctx.fillStyle=color; ctx.fillRect(4,-3,4,5);
-    ctx.fillStyle='#9a9aa8'; ctx.fillRect(-5,1,4,6);
+    c.fillRect(-6,-2,12,4);
+    c.fillStyle=color; c.fillRect(4,-3,4,5);
+    c.fillStyle='#9a9aa8'; c.fillRect(-5,1,4,6);
   }
-  ctx.restore();
+  c.restore();
 }
 
 function drawSoldier(p){
@@ -2137,24 +2240,28 @@ function drawSoldier(p){
 
 function drawControls(){
   const L=controlLayout();
-  // joystick base (anchored home, or where finger is)
+  // movement joystick (left)
   const bx = joy.active ? joy.cx : L.joyHome.x;
   const by = joy.active ? joy.cy : L.joyHome.y;
   ctx.fillStyle='rgba(60,45,90,0.35)';
   ctx.strokeStyle='rgba(202,163,255,0.6)'; ctx.lineWidth=2;
   ctx.beginPath(); ctx.arc(bx,by,JOY_R,0,Math.PI*2); ctx.fill(); ctx.stroke();
-  // knob
   ctx.fillStyle = joy.active ? 'rgba(202,163,255,0.75)' : 'rgba(202,163,255,0.45)';
   ctx.beginPath(); ctx.arc(bx+joy.dx, by+joy.dy, 30, 0, Math.PI*2); ctx.fill();
 
-  // attack button
-  const a=L.attack;
-  ctx.fillStyle = attackHeld ? 'rgba(255,90,122,0.7)' : 'rgba(245,215,122,0.4)';
-  ctx.strokeStyle='rgba(245,215,122,0.8)'; ctx.lineWidth=3;
-  ctx.beginPath(); ctx.arc(a.x,a.y,a.r,0,Math.PI*2); ctx.fill(); ctx.stroke();
-  ctx.fillStyle='#0b0d18'; ctx.font='bold '+Math.floor(a.r*0.55)+'px Trebuchet MS';
+  // aim joystick (right) — drag to aim, triggers auto-fire
+  const ax = aimJoy.active ? aimJoy.cx : L.aimHome.x;
+  const ay = aimJoy.active ? aimJoy.cy : L.aimHome.y;
+  const firing = aimJoy.active && Math.hypot(aimJoy.dx,aimJoy.dy)>8;
+  ctx.fillStyle = firing ? 'rgba(255,90,122,0.32)' : 'rgba(245,180,60,0.20)';
+  ctx.strokeStyle = firing ? 'rgba(255,90,122,0.85)' : 'rgba(245,215,122,0.60)'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(ax,ay,AIM_JOY_R,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = firing ? 'rgba(255,90,122,0.90)' : 'rgba(245,215,122,0.45)';
+  ctx.beginPath(); ctx.arc(ax+aimJoy.dx, ay+aimJoy.dy, 30, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle = firing ? '#ffffff' : '#f5d77a';
+  ctx.font='bold '+Math.floor(AIM_JOY_R*0.44)+'px Trebuchet MS';
   ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText('⚔', a.x, a.y+2);
+  ctx.fillText('⚔', ax, ay+2);
   ctx.textBaseline='alphabetic';
 }
 
@@ -2223,10 +2330,11 @@ const startCoopBtn=document.getElementById('startCoopBtn'), codeInput=document.g
 
 // ---- Single player ----
 function startGame(){
-  ensureAudio(); // unlock audio on this user gesture
+  ensureAudio();
   netTeardown();
   startScreen.classList.add('hidden'); overScreen.classList.add('hidden'); lobbyScreen.classList.add('hidden');
-  pauseScreen.classList.add('hidden'); settingsScreen.classList.add('hidden'); charScreen.classList.add('hidden'); shopScreen.classList.add('hidden');
+  pauseScreen.classList.add('hidden'); settingsScreen.classList.add('hidden'); charScreen.classList.add('hidden');
+  shopScreen.classList.add('hidden'); weaponShopScreen.classList.add('hidden');
   hud.style.display='flex'; endmsg.style.fontSize='';
   score=0; addScore(0);
   resetLocalPlayer(); buildWorld(); nextMissileTime=performance.now()+10000; startLevel(0, true); state='play';
@@ -2234,7 +2342,7 @@ function startGame(){
 function goToMenu(){
   overScreen.classList.add('hidden'); lobbyScreen.classList.add('hidden');
   pauseScreen.classList.add('hidden'); settingsScreen.classList.add('hidden');
-  charScreen.classList.add('hidden'); shopScreen.classList.add('hidden');
+  charScreen.classList.add('hidden'); shopScreen.classList.add('hidden'); weaponShopScreen.classList.add('hidden');
   hud.style.display='none'; bossWrap.classList.remove('show');
   startScreen.classList.remove('hidden'); state='menu';
 }
@@ -2247,7 +2355,7 @@ function onRetry(){
 function coopRestart(){
   overScreen.classList.add('hidden'); hud.style.display='flex';
   score=0; addScore(0);
-  for(const p of players){ p.out=false; p.dead=false; p.lives=1; p.hp=p.maxHp; p.weapon='pistol'; }
+  for(const p of players){ p.out=false; p.dead=false; p.lives=1; p.hp=p.maxHp; p.weapon=p.isLocal?(equippedWeapon||'pistol'):'pistol'; }
   buildWorld(); sendWorldToAll(); startLevel(0, true); state='play';
 }
 
@@ -2297,7 +2405,7 @@ function hostCreateRoom(){
       updatePlayerList();
       lobbyStatus.textContent=net.conns.length+' friend(s) connected.';
     });
-    conn.on('data', d=>{ if(d&&d.t==='input'&&conn.gp){ conn.gp.input.mx=d.mx; conn.gp.input.my=d.my; conn.gp.input.atk=!!d.atk; if(d.ch&&CHARACTERS[d.ch]) conn.gp.char=d.ch; } });
+    conn.on('data', d=>{ if(d&&d.t==='input'&&conn.gp){ conn.gp.input.mx=d.mx; conn.gp.input.my=d.my; conn.gp.input.atk=!!d.atk; if(d.ch&&CHARACTERS[d.ch]) conn.gp.char=d.ch; if(typeof d.aim==='number') conn.gp.aim=d.aim; } });
     conn.on('close', ()=>hostDropConn(conn));
     conn.on('error', ()=>hostDropConn(conn));
   });
@@ -2395,13 +2503,12 @@ function applySnapshot(s){
 function showClientGameOver(ov){
   hud.style.display='none'; bossWrap.classList.remove('show');
   const win=ov&&ov.win;
-  const earned = Math.floor(score*0.33);
-  money += earned; saveMoney(); updateMenuHiscore();
+  updateMenuHiscore();
   endmsg.textContent=win?'VICTORY!':'YOU DIED';
   endmsg.style.fontSize=win?'clamp(34px,10vw,72px)':'';
   overSub.innerHTML=(win?'Your squad conquered the wasteland':'Your squad has fallen')+
     '<div style="margin-top:14px;font-size:clamp(20px,6vw,30px);color:#f5d77a;font-weight:900">SCORE: '+score+'</div>'+
-    '<div style="margin-top:6px;font-size:clamp(15px,4vw,20px);color:#ffd24d;font-weight:bold">+ '+earned+' COINS  ·  TOTAL '+money+'</div>'+
+    '<div style="margin-top:6px;font-size:clamp(15px,4vw,20px);color:#ffd24d;font-weight:bold">🪙 TOTAL: '+money+' MONEDAS</div>'+
     '<div style="margin-top:4px;font-size:13px;color:#caa3ff">Waiting for the host…</div>';
   retryBtn.textContent='HOST RESTARTS';
   prepSaveRow();
@@ -2411,7 +2518,7 @@ function sendInput(){
   const c=net.conns[0]; if(!c||!c.open) return;
   const now=performance.now(); if(now-net.lastInput<50) return; net.lastInput=now;
   const inp=readLocalInput();
-  try{ c.send({t:'input',mx:inp.mx,my:inp.my,atk:inp.atk,ch:selectedChar}); }catch(e){}
+  try{ c.send({t:'input',mx:inp.mx,my:inp.my,atk:inp.atk,ch:selectedChar,aim:player?+player.aim.toFixed(2):0}); }catch(e){}
 }
 function clientUpdate(){
   sendInput();
@@ -2433,6 +2540,8 @@ document.getElementById('startBtn').onclick=startGame;
 // Online co-op paused: menu button removed (lobby code kept for later)
 const _onlineBtn=document.getElementById('onlineBtn'); if(_onlineBtn) _onlineBtn.onclick=openLobby;
 document.getElementById('armoryBtn').onclick=openShop;
+document.getElementById('weaponShopBtn').onclick=openWeaponShop;
+document.getElementById('weaponShopBackBtn').onclick=closeWeaponShop;
 document.getElementById('charBtn').onclick=openChars;
 document.getElementById('charDoneBtn').onclick=closeChars;
 document.getElementById('shopBackBtn').onclick=closeShop;
