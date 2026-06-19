@@ -1,5 +1,5 @@
-// Blackking Arena service worker
-const CACHE = 'blackking-arena-v22';
+// Shooter Arena service worker
+const CACHE = 'shooter-arena-v23';
 const ASSETS = [
   'index.html',
   'manifest.json',

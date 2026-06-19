@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>BLACKKING ARENA</title>
+<title>SHOOTER ARENA</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0b0d18">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Blackking Arena">
+<meta name="apple-mobile-web-app-title" content="Shooter Arena">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" type="image/png" href="icon-192.png">
 <style>
@@ -163,7 +163,7 @@
 
 <div class="overlay" id="startScreen">
   <!-- ── Header ── -->
-  <div class="title">BLACKKING<br>ARENA</div>
+  <div class="title">SHOOTER<br>ARENA</div>
   <div style="display:flex;gap:16px;align-items:center;margin-top:7px;flex-wrap:wrap;justify-content:center">
     <div id="hiscoreMenu" style="font-size:13px;color:#f5d77a;font-weight:bold">HIGH SCORE: 0</div>
     <div id="coinsMenu"  style="font-size:13px;color:#ffd24d;font-weight:bold">🪙 0 COINS</div>
@@ -373,12 +373,12 @@ const LEVELS=[
   {name:"LEVEL 2", enemies:8,  espeed:1.0, ehp:2, eShoot:0.006, boss:{name:"QUEEN VYLAXIS",   hp:45, speed:1.1, fireRate:48, color:'#b07cff', skin:'insectoid'}},
   {name:"LEVEL 3", enemies:10, espeed:1.1, ehp:3, eShoot:0.008, boss:{name:"THE HIVE MIND",    hp:65, speed:0.9, fireRate:40, color:'#5aff8a', skin:'swarm'}},
   {name:"LEVEL 4", enemies:12, espeed:1.25,ehp:3, eShoot:0.010, boss:{name:"VOID STALKER",  hp:90, speed:1.3, fireRate:32, color:'#5ad1ff', skin:'demon'}},
-  {name:"LEVEL 5", enemies:14, espeed:1.4, ehp:4, eShoot:0.012, boss:{name:"BLACKKING OVERLORD",hp:90, speed:1.4, fireRate:24, color:'#ff3d6e', skin:'demon'}},
+  {name:"LEVEL 5", enemies:14, espeed:1.4, ehp:4, eShoot:0.012, boss:{name:"SHOOTER OVERLORD",hp:90, speed:1.4, fireRate:24, color:'#ff3d6e', skin:'demon'}},
   {name:"LEVEL 6", enemies:16, espeed:1.5, ehp:4, eShoot:0.014, boss:{name:"NEXARI PRIME",    hp:170, speed:1.45,fireRate:22, color:'#ffae42', skin:'mech'}},
   {name:"LEVEL 7", enemies:18, espeed:1.6, ehp:5, eShoot:0.016, boss:{name:"CRYO WIDOW",      hp:215, speed:1.55,fireRate:20, color:'#42f5e3', skin:'crystal'}},
   {name:"LEVEL 8", enemies:20, espeed:1.7, ehp:5, eShoot:0.018, boss:{name:"OMEGA SWARM",     hp:265, speed:1.45,fireRate:18, color:'#9d5aff', skin:'cyclops'}},
   {name:"LEVEL 9", enemies:22, espeed:1.85,ehp:6, eShoot:0.020, boss:{name:"TITAN MAW",       hp:330, speed:1.6, fireRate:16, color:'#ff5ad1', skin:'slimeking'}},
-  {name:"LEVEL 10",enemies:24, espeed:2.0, ehp:7, eShoot:0.024, boss:{name:"BLACKKING ASCENDANT",hp:200,speed:1.7, fireRate:13, color:'#ff2d4d', skin:'hydra'}},
+  {name:"LEVEL 10",enemies:24, espeed:2.0, ehp:7, eShoot:0.024, boss:{name:"SHOOTER ASCENDANT",hp:200,speed:1.7, fireRate:13, color:'#ff2d4d', skin:'hydra'}},
   // ---- Levels 11-20: difficulty climbs at HALF the previous step (gentler back half) ----
   {name:"LEVEL 11",enemies:25, espeed:2.06,ehp:7, eShoot:0.025, boss:{name:"ROT SOVEREIGN",     hp:480, speed:1.72,fireRate:13, color:'#7aff5a', skin:'tentacle'}},
   {name:"LEVEL 12",enemies:26, espeed:2.12,ehp:8, eShoot:0.026, boss:{name:"SKARN BROODMOTHER",  hp:530, speed:1.73,fireRate:12, color:'#c0ff42', skin:'insectoid'}},
@@ -1454,7 +1454,7 @@ function gameOver(win){
   if(win){
     endmsg.textContent='VICTORY!';
     endmsg.style.fontSize='clamp(34px,10vw,72px)';
-    overSub.innerHTML='You have conquered the arena'+scoreLine+'<br><span class="credit">PROPERTY OF BLACKKING</span>';
+    overSub.innerHTML='You have conquered the arena'+scoreLine+'<br><span class="credit">PROPERTY OF SHOOTER ARENA</span>';
     retryBtn.textContent='PLAY AGAIN';
   } else {
     endmsg.textContent='YOU DIED';

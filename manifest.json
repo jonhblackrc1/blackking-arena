@@ -1,7 +1,7 @@
 {
-  "name": "Blackking Arena",
-  "short_name": "Blackking",
-  "description": "Top-down alien shooter. 5 levels, 5 alien bosses.",
+  "name": "Shooter Arena",
+  "short_name": "Shooter",
+  "description": "Top-down alien shooter. 20 levels, 4 alien bosses.",
   "start_url": "index.html",
   "scope": "./",
   "display": "fullscreen",
