@@ -108,6 +108,33 @@
   .bossfill { height:100%; background:linear-gradient(90deg,#b07cff,#ff5a7a); transition:width .12s; }
   #endmsg { font-size:clamp(30px,9vw,66px); }
   .credit { margin-top:18px; font-size:clamp(16px,4.5vw,24px); color:#f5d77a; letter-spacing:5px; font-weight:bold; }
+  /* ---- Swipeable menu tabs ---- */
+  .menuTabBar { display:flex; gap:5px; width:min(92vw,390px); margin:10px 0 0; flex-shrink:0; }
+  .menuTab {
+    flex:1; padding:8px 2px; border:1.5px solid rgba(120,90,180,0.3); border-radius:18px;
+    background:rgba(60,45,90,0.18); color:#9b94c4; font-size:11px; font-weight:bold;
+    cursor:pointer; letter-spacing:0.5px; -webkit-tap-highlight-color:transparent;
+    transition:all .18s; line-height:1.4; text-align:center;
+  }
+  .menuTab.active {
+    background:linear-gradient(135deg,rgba(245,215,122,0.22),rgba(202,163,255,0.22));
+    color:#f5d77a; border-color:rgba(245,215,122,0.5);
+  }
+  .menuSliderWrap { width:min(92vw,390px); overflow:hidden; flex-shrink:0; margin-top:8px; }
+  .menuSlider { display:flex; will-change:transform; transition:transform .28s cubic-bezier(.4,0,.2,1); }
+  .menuPane { min-width:min(92vw,390px); width:min(92vw,390px); max-height:42vh; overflow-y:auto; box-sizing:border-box; padding:0 2px; }
+  /* mode cards */
+  .modeCard {
+    display:flex; align-items:center; gap:12px;
+    background:rgba(120,160,90,0.07); border:1px solid rgba(120,160,90,0.22);
+    border-radius:14px; padding:14px 14px; margin-top:10px; cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .modeCard.locked { opacity:0.42; cursor:default; }
+  .modeCard.sel { border-color:#5aff8a; background:rgba(90,255,138,0.1); }
+  .modeIcon { font-size:36px; line-height:1; flex-shrink:0; }
+  .modeName { color:#f5d77a; font-weight:bold; font-size:15px; letter-spacing:1px; }
+  .modeDesc { font-size:12px; color:#9b94c4; margin-top:2px; line-height:1.5; }
 </style>
 </head>
 <body>
@@ -135,22 +162,52 @@
 </div>
 
 <div class="overlay" id="startScreen">
+  <!-- ── Header ── -->
   <div class="title">BLACKKING<br>ARENA</div>
-  <div class="sub">MARS COLONY · 20 ZONES · 4 BOSSES</div>
-  <div class="sub" id="hiscoreMenu" style="margin-top:8px;color:#f5d77a;font-weight:bold">HIGH SCORE: 0</div>
-  <div class="sub" id="coinsMenu" style="margin-top:4px;color:#ffd24d;font-weight:bold">🪙 0 COINS</div>
-  <div id="leaderboardMenu" class="board"></div>
-  <div class="btnRow">
-    <button class="btn" id="startBtn">PLAY</button>
+  <div style="display:flex;gap:16px;align-items:center;margin-top:7px;flex-wrap:wrap;justify-content:center">
+    <div id="hiscoreMenu" style="font-size:13px;color:#f5d77a;font-weight:bold">HIGH SCORE: 0</div>
+    <div id="coinsMenu"  style="font-size:13px;color:#ffd24d;font-weight:bold">🪙 0 COINS</div>
   </div>
-  <button class="btn btn-alt" id="charBtn" style="margin-top:14px">🦸 CHARACTER</button>
-  <button class="btn btn-alt" id="weaponShopBtn" style="margin-top:10px">🔫 ARMAS</button>
-  <button class="btn btn-alt" id="armoryBtn" style="margin-top:10px">⚙ ARMORY · UPGRADES</button>
-  <div class="info">
-    <b>Joystick</b> (left): drag to move your character in any direction.<br>
-    <b>⚔ Joystick</b> (right): drag to aim and auto-fire. Hold to keep firing.<br>
-    <b>Keyboard</b> (PC): WASD / Arrows to move · Mouse aim & click to fire.<br>
-    Dodge the plasma and defeat the alien boss of each level.
+
+  <!-- ── Tab bar ── -->
+  <div class="menuTabBar" id="menuTabBar">
+    <button class="menuTab active" data-pane="0">🦸<br>CHARS</button>
+    <button class="menuTab"        data-pane="1">🔫<br>WEAPONS</button>
+    <button class="menuTab"        data-pane="2">🎮<br>MODES</button>
+  </div>
+
+  <!-- ── Swipeable panes ── -->
+  <div class="menuSliderWrap" id="menuSliderWrap">
+    <div class="menuSlider" id="menuSlider">
+
+      <!-- Pane 0 · Characters -->
+      <div class="menuPane" id="paneChars">
+        <div id="charGrid"></div>
+      </div>
+
+      <!-- Pane 1 · Weapons -->
+      <div class="menuPane" id="paneWeapons">
+        <div id="weaponPaneList"></div>
+      </div>
+
+      <!-- Pane 2 · Game Modes -->
+      <div class="menuPane" id="paneModes">
+        <div id="modesList"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Actions ── -->
+  <button class="btn" id="startBtn" style="margin-top:14px">PLAY</button>
+  <button class="btn btn-alt" id="armoryBtn" style="margin-top:10px;padding:12px 32px;font-size:16px">⚙ ARMORY</button>
+
+  <!-- Compact leaderboard -->
+  <div id="leaderboardMenu" class="board" style="margin-top:8px"></div>
+
+  <div class="info" style="margin-top:14px;font-size:12px">
+    <b>Joystick</b> izq: mover · <b>⚔ Joystick</b> der: apuntar y disparar.<br>
+    <b>PC</b>: WASD + mouse para apuntar · clic para disparar.
   </div>
 </div>
 
@@ -226,14 +283,7 @@
   <button class="btn btn-alt" id="shopBackBtn" style="margin-top:16px">← BACK</button>
 </div>
 
-<!-- ===== Weapon Shop / ARMAS ===== -->
-<div class="overlay hidden" id="weaponShopScreen">
-  <div class="title" style="font-size:clamp(26px,7vw,48px)">🔫 ARMAS</div>
-  <div class="sub" id="weaponShopMoney" style="margin-top:6px;color:#ffd24d;font-weight:bold">🪙 0 MONEDAS</div>
-  <div class="info" style="margin:4px 0 2px">Compra y equipa tu arma antes de entrar al combate.</div>
-  <div id="weaponShopList" style="width:min(92vw,430px);margin-top:4px;overflow-y:auto;max-height:55vh"></div>
-  <button class="btn btn-alt" id="weaponShopBackBtn" style="margin-top:14px">← VOLVER</button>
-</div>
+<!-- weaponShopScreen removed — weapon shop is now inline in the menu tabs -->
 
 <!-- ===== In-game pause menu ===== -->
 <div class="overlay hidden" id="pauseScreen">
@@ -253,13 +303,7 @@
   <button class="btn btn-alt" id="settingsBackBtn" style="margin-top:18px">&#8592; BACK</button>
 </div>
 
-<!-- ===== Character select ===== -->
-<div class="overlay hidden" id="charScreen">
-  <div class="title" style="font-size:clamp(26px,7vw,48px)">CHARACTER</div>
-  <div class="info" style="margin:6px 0 2px">Pick your fighter.</div>
-  <div id="charGrid"></div>
-  <button class="btn" id="charDoneBtn" style="margin-top:8px">DONE</button>
-</div>
+<!-- charScreen removed — character selection is now inline in the menu tabs -->
 
 <script src="peerjs.min.js"></script>
 <script>
@@ -626,10 +670,7 @@ function buyUpgrade(weapon, track){
 function openShop(){ startScreen.classList.add('hidden'); shopScreen.classList.remove('hidden'); renderShop(); }
 function closeShop(){ shopScreen.classList.add('hidden'); startScreen.classList.remove('hidden'); }
 
-// ---- Weapon shop (buy / equip) ----
-const weaponShopScreen=document.getElementById('weaponShopScreen');
-const weaponShopList=document.getElementById('weaponShopList');
-const weaponShopMoney=document.getElementById('weaponShopMoney');
+// ---- Weapon shop (buy / equip) — renders inline inside WEAPONS tab pane ----
 const WEAPON_SHOP_ORDER=['pistol','rifle','ak','shotgun','smg','scar','goldshotgun'];
 
 function drawWeaponPreview(canvas, key){
@@ -640,14 +681,15 @@ function drawWeaponPreview(canvas, key){
     pc.globalAlpha=0.22; pc.fillStyle='#ffd24d';
     pc.beginPath(); pc.arc(cw/2,ch/2,22,0,Math.PI*2); pc.fill(); pc.globalAlpha=1;
   }
-  pc.save();
-  pc.translate(cw/2, ch/2);
+  pc.save(); pc.translate(cw/2, ch/2);
   drawWeaponIcon(key, isGoldenWeapon(key)?20:16, WEAPONS[key].color, pc);
   pc.restore();
 }
 
-function renderWeaponShop(){
-  if(weaponShopMoney) weaponShopMoney.textContent='🪙 '+money+' MONEDAS';
+function renderWeaponShop(container){
+  if(!container) container=document.getElementById('weaponPaneList');
+  if(!container) return;
+  updateMenuHiscore(); // keep coin display fresh
   let html='';
   for(const key of WEAPON_SHOP_ORDER){
     const w=WEAPONS[key], price=WEAPON_PRICES[key];
@@ -661,34 +703,34 @@ function renderWeaponShop(){
           '<div style="font-size:11px;color:#9b94c4;margin-top:3px;line-height:1.7">'+
             'DMG <b style="color:#f5d77a">'+w.dmg.toFixed(1)+'</b> &nbsp;'+
             'RATE <b style="color:#caa3ff">'+w.fireRate+'</b> &nbsp;'+
-            'BALAS <b style="color:#5ad1ff">'+w.pellets+'</b>'+
+            'SHOTS <b style="color:#5ad1ff">'+w.pellets+'</b>'+
             (w.pierce?'&nbsp; PIERCE <b style="color:#ff9d4d">'+w.pierce+'</b>':'')+
           '</div>'+
         '</div>'+
       '</div>'+
       '<div style="display:flex;gap:8px;margin-top:8px;align-items:center;justify-content:space-between">'+
         (equipped
-          ? '<span style="color:#5aff8a;font-weight:bold;font-size:13px;letter-spacing:1px">✓ EQUIPADA</span><span></span>'
+          ? '<span style="color:#5aff8a;font-weight:bold;font-size:13px;letter-spacing:1px">✓ EQUIPPED</span><span></span>'
           : owned
-            ? '<span></span><button class="ubuy" data-equip="'+key+'">EQUIPAR</button>'
+            ? '<span></span><button class="ubuy" data-equip="'+key+'">EQUIP</button>'
             : (price===0
-                ? '<span></span><button class="ubuy" data-buy="'+key+'">GRATIS</button>'
+                ? '<span></span><button class="ubuy" data-buy="'+key+'">FREE</button>'
                 : '<span style="font-size:12px;color:'+(canBuy?'#ffd24d':'#7d77a3')+'">🪙 '+price+'</span>'+
-                  '<button class="ubuy'+(canBuy?'':' off')+'" data-buy="'+key+'"'+(canBuy?'':' disabled')+'>COMPRAR</button>'
+                  '<button class="ubuy'+(canBuy?'':' off')+'" data-buy="'+key+'"'+(canBuy?'':' disabled')+'>BUY</button>'
               )
         )+
       '</div>'+
     '</div>';
   }
-  weaponShopList.innerHTML=html;
+  container.innerHTML=html;
   for(const key of WEAPON_SHOP_ORDER){
     const c=document.getElementById('wpr_'+key);
     if(c) drawWeaponPreview(c,key);
   }
-  weaponShopList.querySelectorAll('[data-buy]').forEach(b=>{
+  container.querySelectorAll('[data-buy]').forEach(b=>{
     b.onclick=()=>buyWeapon(b.getAttribute('data-buy'));
   });
-  weaponShopList.querySelectorAll('[data-equip]').forEach(b=>{
+  container.querySelectorAll('[data-equip]').forEach(b=>{
     b.onclick=()=>equipWeapon(b.getAttribute('data-equip'));
   });
 }
@@ -696,7 +738,7 @@ function renderWeaponShop(){
 function buyWeapon(key){
   if(ownedWeapons.includes(key)) return;
   const price=WEAPON_PRICES[key];
-  if(price>0&&money<price){ showToast('SIN FONDOS'); return; }
+  if(price>0&&money<price){ showToast('NO FUNDS'); return; }
   money=Math.max(0,money-price); saveMoney();
   if(!ownedWeapons.includes(key)) ownedWeapons.push(key);
   saveOwnedWeapons();
@@ -708,17 +750,14 @@ function equipWeapon(key){
   equippedWeapon=key; saveEquippedWeapon();
   if(player&&player.isLocal) player.weapon=key;
   sfx('pickup');
-  renderWeaponShop();
+  renderWeaponShop(); // re-render inline pane
   updateMenuHiscore();
 }
 
-function openWeaponShop(){ startScreen.classList.add('hidden'); weaponShopScreen.classList.remove('hidden'); renderWeaponShop(); }
-function closeWeaponShop(){ weaponShopScreen.classList.add('hidden'); startScreen.classList.remove('hidden'); }
-
-// ---- Character select ----
-const charScreen=document.getElementById('charScreen');
+// ---- Character select — now inline inside CHARS tab pane ----
 const charGrid=document.getElementById('charGrid');
 function renderChars(){
+  if(!charGrid) return;
   charGrid.innerHTML = CHAR_ORDER.map(k=>{
     const c=CHARACTERS[k];
     return '<div class="charcard'+(k===selectedChar?' sel':'')+'" data-c="'+k+'">'+
@@ -734,8 +773,79 @@ function renderChars(){
     };
   });
 }
-function openChars(){ startScreen.classList.add('hidden'); charScreen.classList.remove('hidden'); renderChars(); }
-function closeChars(){ charScreen.classList.add('hidden'); startScreen.classList.remove('hidden'); }
+
+// ---- Game Modes panel ----
+const GAME_MODES=[
+  { id:'survival', icon:'⚔', name:'SURVIVAL',     desc:'20 levels · 4 bosses · Classic run', levels:20, sel:true  },
+  { id:'arcade',   icon:'⚡', name:'ARCADE',       desc:'Coming soon',                         levels:null,sel:false },
+  { id:'endless',  icon:'♾', name:'ENDLESS',      desc:'Coming soon',                         levels:null,sel:false },
+  { id:'coop',     icon:'👥', name:'CO-OP ONLINE', desc:'Coming soon',                         levels:null,sel:false },
+];
+function renderModes(){
+  const el=document.getElementById('modesList'); if(!el) return;
+  el.innerHTML=GAME_MODES.map(m=>{
+    const locked=!m.sel && !m.id.startsWith('survival');
+    return '<div class="modeCard'+(m.sel?' sel':'')+(locked?' locked':'')+'"'+(m.sel?'':'')+'>'+
+      '<div class="modeIcon">'+m.icon+'</div>'+
+      '<div style="flex:1">'+
+        '<div class="modeName">'+(locked?'🔒 ':'')+m.name+'</div>'+
+        '<div class="modeDesc">'+m.desc+'</div>'+
+        (m.levels?'<div style="font-size:11px;color:#5ad1ff;margin-top:3px">'+m.levels+' LEVELS</div>':'')+
+      '</div>'+
+      (m.sel?'<div style="color:#5aff8a;font-size:20px">✓</div>':'<div style="color:#5a5278;font-size:11px;white-space:nowrap">SOON</div>')+
+    '</div>';
+  }).join('');
+}
+
+// ---- Menu tab + swipe system ----
+let menuPaneIdx=0;
+const MENU_PANE_N=3;
+let _swX=0, _swY=0, _swActive=false;
+
+function goToPane(idx, skipAnim){
+  menuPaneIdx=Math.max(0,Math.min(MENU_PANE_N-1,idx));
+  const wrap=document.getElementById('menuSliderWrap');
+  const slider=document.getElementById('menuSlider');
+  if(!slider||!wrap) return;
+  const pw=wrap.offsetWidth||360;
+  slider.style.transition=skipAnim?'none':'transform .28s cubic-bezier(.4,0,.2,1)';
+  slider.style.transform='translateX(-'+(menuPaneIdx*pw)+'px)';
+  document.querySelectorAll('.menuTab').forEach((b,i)=>b.classList.toggle('active',i===menuPaneIdx));
+  // lazy render pane content
+  if(menuPaneIdx===0) renderChars();
+  if(menuPaneIdx===1) renderWeaponShop();
+  if(menuPaneIdx===2) renderModes();
+}
+
+// Tab click
+document.addEventListener('DOMContentLoaded', ()=>{
+  document.querySelectorAll('.menuTab').forEach(b=>{
+    b.addEventListener('click',()=>{ ensureAudio(); goToPane(+b.getAttribute('data-pane')); });
+  });
+  // Touch swipe on slider wrap
+  const wrap=document.getElementById('menuSliderWrap');
+  if(wrap){
+    wrap.addEventListener('touchstart',e=>{
+      _swX=e.touches[0].clientX; _swY=e.touches[0].clientY; _swActive=false;
+    },{passive:true});
+    wrap.addEventListener('touchmove',e=>{
+      const dx=e.touches[0].clientX-_swX, dy=e.touches[0].clientY-_swY;
+      if(!_swActive&&Math.abs(dx)>Math.abs(dy)&&Math.abs(dx)>10) _swActive=true;
+      if(_swActive){
+        e.preventDefault();
+        const slider=document.getElementById('menuSlider');
+        const pw=wrap.offsetWidth||360;
+        if(slider){ slider.style.transition='none'; slider.style.transform='translateX(-'+(menuPaneIdx*pw-dx)+'px)'; }
+      }
+    },{passive:false});
+    wrap.addEventListener('touchend',e=>{
+      if(!_swActive){ goToPane(menuPaneIdx); return; }
+      const dx=e.changedTouches[0].clientX-_swX;
+      goToPane(menuPaneIdx+(dx<-50?1:dx>50?-1:0));
+      _swActive=false;
+    },{passive:true});
+  }
+});
 
 // ---- In-game pause menu & settings ----
 const pauseScreen=document.getElementById('pauseScreen');
@@ -2333,8 +2443,8 @@ function startGame(){
   ensureAudio();
   netTeardown();
   startScreen.classList.add('hidden'); overScreen.classList.add('hidden'); lobbyScreen.classList.add('hidden');
-  pauseScreen.classList.add('hidden'); settingsScreen.classList.add('hidden'); charScreen.classList.add('hidden');
-  shopScreen.classList.add('hidden'); weaponShopScreen.classList.add('hidden');
+  pauseScreen.classList.add('hidden'); settingsScreen.classList.add('hidden');
+  shopScreen.classList.add('hidden');
   hud.style.display='flex'; endmsg.style.fontSize='';
   score=0; addScore(0);
   resetLocalPlayer(); buildWorld(); nextMissileTime=performance.now()+10000; startLevel(0, true); state='play';
@@ -2342,9 +2452,10 @@ function startGame(){
 function goToMenu(){
   overScreen.classList.add('hidden'); lobbyScreen.classList.add('hidden');
   pauseScreen.classList.add('hidden'); settingsScreen.classList.add('hidden');
-  charScreen.classList.add('hidden'); shopScreen.classList.add('hidden'); weaponShopScreen.classList.add('hidden');
+  shopScreen.classList.add('hidden');
   hud.style.display='none'; bossWrap.classList.remove('show');
   startScreen.classList.remove('hidden'); state='menu';
+  renderChars(); renderWeaponShop(); renderModes(); updateMenuHiscore();
 }
 function quitToMenu(){ netTeardown(); goToMenu(); }
 function onRetry(){
@@ -2539,11 +2650,7 @@ function netTeardown(){
 document.getElementById('startBtn').onclick=startGame;
 // Online co-op paused: menu button removed (lobby code kept for later)
 const _onlineBtn=document.getElementById('onlineBtn'); if(_onlineBtn) _onlineBtn.onclick=openLobby;
-document.getElementById('armoryBtn').onclick=openShop;
-document.getElementById('weaponShopBtn').onclick=openWeaponShop;
-document.getElementById('weaponShopBackBtn').onclick=closeWeaponShop;
-document.getElementById('charBtn').onclick=openChars;
-document.getElementById('charDoneBtn').onclick=closeChars;
+document.getElementById('armoryBtn').onclick=()=>{ ensureAudio(); goToPane(1); };
 document.getElementById('shopBackBtn').onclick=closeShop;
 document.getElementById('pauseBtn').onclick=openPause;
 document.getElementById('resumeBtn').onclick=resumeGame;
@@ -2567,6 +2674,8 @@ nameInput.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(
 
 state='menu';
 updateMenuHiscore();
+renderChars(); renderWeaponShop(); renderModes();
+goToPane(0, true);
 initPlayer();
 loop();
 
