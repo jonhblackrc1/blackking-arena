@@ -329,7 +329,7 @@ if(!CanvasRenderingContext2D.prototype.roundRect){
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 let W, H, DPR;
-let ZOOM=0.488;         // 0.651 * 0.75 → camera another 25% farther
+let ZOOM=0.976;         // doubled zoom (0.488 -> 0.976) → camera twice as close
 let VW=0, VH=0;         // visible world size = screen / zoom
 function resize(){
   DPR = Math.min(window.devicePixelRatio||1, 2);
