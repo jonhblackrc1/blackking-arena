@@ -108,31 +108,83 @@
   .bossfill { height:100%; background:linear-gradient(90deg,#b07cff,#ff5a7a); transition:width .12s; }
   #endmsg { font-size:clamp(30px,9vw,66px); }
   .credit { margin-top:18px; font-size:clamp(16px,4.5vw,24px); color:#f5d77a; letter-spacing:5px; font-weight:bold; }
-  /* ---- Swipeable menu tabs ---- */
-  .menuTabBar { display:flex; gap:5px; width:min(92vw,390px); margin:10px 0 0; flex-shrink:0; }
+  /* ============ MODERN SWIPEABLE MENU ============ */
+  #startScreen { justify-content:flex-start; padding:0; }
+  .menuShell {
+    width:min(94vw,420px); margin:auto; display:flex; flex-direction:column;
+    align-items:center; padding:calc(env(safe-area-inset-top,0px) + 14px) 0 16px;
+  }
+  .menuTitle { font-size:clamp(30px,9vw,58px); letter-spacing:3px; line-height:0.95; }
+  /* stat pills */
+  .statRow { display:flex; gap:10px; margin-top:12px; }
+  .statPill {
+    display:flex; align-items:center; gap:6px; padding:7px 16px; border-radius:30px;
+    background:rgba(255,255,255,0.05); border:1px solid rgba(176,124,255,0.35);
+    backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+    font-size:14px; font-weight:900; color:#e8e6f5; letter-spacing:0.5px;
+    box-shadow:0 2px 14px rgba(0,0,0,0.3);
+  }
+  .statPill.gold { border-color:rgba(255,210,77,0.5); color:#ffd24d; }
+  .statIco { font-size:15px; }
+  /* tab bar */
+  .menuTabBar { display:flex; gap:6px; width:100%; margin:16px 0 0; flex-shrink:0; }
   .menuTab {
-    flex:1; padding:8px 2px; border:1.5px solid rgba(120,90,180,0.3); border-radius:18px;
-    background:rgba(60,45,90,0.18); color:#9b94c4; font-size:11px; font-weight:bold;
-    cursor:pointer; letter-spacing:0.5px; -webkit-tap-highlight-color:transparent;
-    transition:all .18s; line-height:1.4; text-align:center;
+    flex:1; padding:9px 2px; border:1px solid rgba(176,124,255,0.18); border-radius:16px;
+    background:rgba(255,255,255,0.03); color:#9b94c4; font-size:10px; font-weight:bold;
+    cursor:pointer; letter-spacing:0.6px; -webkit-tap-highlight-color:transparent;
+    transition:all .2s; display:flex; flex-direction:column; align-items:center; gap:3px;
+    position:relative; overflow:hidden;
   }
+  .menuTab .tabIco { font-size:18px; line-height:1; filter:grayscale(0.4) opacity(0.7); transition:all .2s; }
   .menuTab.active {
-    background:linear-gradient(135deg,rgba(245,215,122,0.22),rgba(202,163,255,0.22));
-    color:#f5d77a; border-color:rgba(245,215,122,0.5);
+    background:linear-gradient(135deg,rgba(245,215,122,0.18),rgba(176,124,255,0.18));
+    color:#f5d77a; border-color:rgba(245,215,122,0.55);
+    box-shadow:0 4px 18px rgba(176,124,255,0.25);
   }
-  .menuSliderWrap { width:min(92vw,390px); overflow:hidden; flex-shrink:0; margin-top:8px; }
-  .menuSlider { display:flex; will-change:transform; transition:transform .28s cubic-bezier(.4,0,.2,1); }
-  .menuPane { min-width:min(92vw,390px); width:min(92vw,390px); max-height:42vh; overflow-y:auto; box-sizing:border-box; padding:0 2px; }
+  .menuTab.active .tabIco { filter:none; transform:scale(1.12); }
+  .menuTab.active::after {
+    content:''; position:absolute; bottom:0; left:25%; right:25%; height:2.5px;
+    background:linear-gradient(90deg,#f5d77a,#caa3ff); border-radius:2px;
+  }
+  .menuSliderWrap { width:100%; overflow:hidden; flex-shrink:0; margin-top:14px;
+    border-radius:18px; }
+  .menuSlider { display:flex; will-change:transform; transition:transform .3s cubic-bezier(.4,0,.2,1); }
+  .menuPane {
+    min-width:min(94vw,420px); width:min(94vw,420px); height:54vh; max-height:520px;
+    overflow-y:auto; box-sizing:border-box; padding:4px;
+    scrollbar-width:thin; scrollbar-color:rgba(176,124,255,0.4) transparent;
+  }
+  .menuPane::-webkit-scrollbar { width:5px; }
+  .menuPane::-webkit-scrollbar-thumb { background:rgba(176,124,255,0.4); border-radius:3px; }
+  #paneModes { display:flex; flex-direction:column; }
+  .menuPlayBtn {
+    margin-top:auto; position:sticky; bottom:0; width:100%; padding:17px; font-size:22px;
+    letter-spacing:3px; border-radius:18px; box-shadow:0 -2px 20px rgba(11,13,24,0.9),0 0 28px rgba(202,163,255,0.55);
+  }
+  .menuPlayBtn:active { transform:scale(0.97); }
+  /* ranking pane */
+  #paneRanking .board { width:100%; margin-top:0; font-size:15px; }
+  #paneRanking .board .row { padding:11px 14px; margin-bottom:6px; border-radius:12px;
+    background:rgba(255,255,255,0.04); border:1px solid rgba(176,124,255,0.12); }
+  #paneRanking .board .row:nth-child(even){ background:rgba(255,255,255,0.04); }
+  #paneRanking .board .rank { width:34px; font-size:16px; color:#caa3ff; }
+  #paneRanking .board .row:nth-child(1) .rank { color:#ffd24d; }
+  #paneRanking .board .row:nth-child(2) .rank { color:#d8d8e8; }
+  #paneRanking .board .row:nth-child(3) .rank { color:#e0a060; }
+  .rankHeader { text-align:center; color:#9b94c4; font-size:12px; letter-spacing:2px;
+    margin-bottom:12px; text-transform:uppercase; }
   /* mode cards */
   .modeCard {
     display:flex; align-items:center; gap:12px;
-    background:rgba(120,160,90,0.07); border:1px solid rgba(120,160,90,0.22);
-    border-radius:14px; padding:14px 14px; margin-top:10px; cursor:pointer;
-    -webkit-tap-highlight-color:transparent;
+    background:rgba(255,255,255,0.04); border:1px solid rgba(176,124,255,0.18);
+    border-radius:16px; padding:14px; margin-bottom:10px; cursor:pointer;
+    -webkit-tap-highlight-color:transparent; transition:all .18s;
   }
-  .modeCard.locked { opacity:0.42; cursor:default; }
-  .modeCard.sel { border-color:#5aff8a; background:rgba(90,255,138,0.1); }
-  .modeIcon { font-size:36px; line-height:1; flex-shrink:0; }
+  .modeCard:not(.locked):active { transform:scale(0.98); }
+  .modeCard.locked { opacity:0.4; cursor:default; }
+  .modeCard.sel { border-color:#5aff8a; background:rgba(90,255,138,0.1);
+    box-shadow:0 0 18px rgba(90,255,138,0.18); }
+  .modeIcon { font-size:34px; line-height:1; flex-shrink:0; }
   .modeName { color:#f5d77a; font-weight:bold; font-size:15px; letter-spacing:1px; }
   .modeDesc { font-size:12px; color:#9b94c4; margin-top:2px; line-height:1.5; }
 </style>
@@ -162,52 +214,50 @@
 </div>
 
 <div class="overlay" id="startScreen">
-  <!-- ── Header ── -->
-  <div class="title">SHOOTER<br>ARENA</div>
-  <div style="display:flex;gap:16px;align-items:center;margin-top:7px;flex-wrap:wrap;justify-content:center">
-    <div id="hiscoreMenu" style="font-size:13px;color:#f5d77a;font-weight:bold">HIGH SCORE: 0</div>
-    <div id="coinsMenu"  style="font-size:13px;color:#ffd24d;font-weight:bold">🪙 0 COINS</div>
-  </div>
-
-  <!-- ── Tab bar ── -->
-  <div class="menuTabBar" id="menuTabBar">
-    <button class="menuTab active" data-pane="0">🦸<br>CHARS</button>
-    <button class="menuTab"        data-pane="1">🔫<br>WEAPONS</button>
-    <button class="menuTab"        data-pane="2">🎮<br>MODES</button>
-  </div>
-
-  <!-- ── Swipeable panes ── -->
-  <div class="menuSliderWrap" id="menuSliderWrap">
-    <div class="menuSlider" id="menuSlider">
-
-      <!-- Pane 0 · Characters -->
-      <div class="menuPane" id="paneChars">
-        <div id="charGrid"></div>
-      </div>
-
-      <!-- Pane 1 · Weapons -->
-      <div class="menuPane" id="paneWeapons">
-        <div id="weaponPaneList"></div>
-      </div>
-
-      <!-- Pane 2 · Game Modes -->
-      <div class="menuPane" id="paneModes">
-        <div id="modesList"></div>
-      </div>
-
+  <div class="menuShell">
+    <!-- ── Header ── -->
+    <div class="title menuTitle">SHOOTER<br>ARENA</div>
+    <div class="statRow">
+      <div class="statPill"><span class="statIco">🏆</span><span id="hiscoreMenu">0</span></div>
+      <div class="statPill gold"><span class="statIco">🪙</span><span id="coinsMenu">0</span></div>
     </div>
-  </div>
 
-  <!-- ── Actions ── -->
-  <button class="btn" id="startBtn" style="margin-top:14px">PLAY</button>
-  <button class="btn btn-alt" id="armoryBtn" style="margin-top:10px;padding:12px 32px;font-size:16px">⚙ ARMORY</button>
+    <!-- ── Tab bar ── -->
+    <div class="menuTabBar" id="menuTabBar">
+      <button class="menuTab active" data-pane="0"><span class="tabIco">🦸</span><span class="tabTxt">CHARS</span></button>
+      <button class="menuTab"        data-pane="1"><span class="tabIco">🔫</span><span class="tabTxt">WEAPONS</span></button>
+      <button class="menuTab"        data-pane="2"><span class="tabIco">🎮</span><span class="tabTxt">MODES</span></button>
+      <button class="menuTab"        data-pane="3"><span class="tabIco">🏆</span><span class="tabTxt">RANKING</span></button>
+    </div>
 
-  <!-- Compact leaderboard -->
-  <div id="leaderboardMenu" class="board" style="margin-top:8px"></div>
+    <!-- ── Swipeable panes ── -->
+    <div class="menuSliderWrap" id="menuSliderWrap">
+      <div class="menuSlider" id="menuSlider">
 
-  <div class="info" style="margin-top:14px;font-size:12px">
-    <b>Joystick</b> izq: mover · <b>⚔ Joystick</b> der: apuntar y disparar.<br>
-    <b>PC</b>: WASD + mouse para apuntar · clic para disparar.
+        <!-- Pane 0 · Characters -->
+        <div class="menuPane" id="paneChars">
+          <div id="charGrid"></div>
+        </div>
+
+        <!-- Pane 1 · Weapons -->
+        <div class="menuPane" id="paneWeapons">
+          <div id="weaponPaneList"></div>
+        </div>
+
+        <!-- Pane 2 · Game Modes (PLAY lives here) -->
+        <div class="menuPane" id="paneModes">
+          <div id="modesList"></div>
+          <button class="btn menuPlayBtn" id="startBtn">▶ PLAY</button>
+        </div>
+
+        <!-- Pane 3 · Ranking -->
+        <div class="menuPane" id="paneRanking">
+          <div class="rankHeader">★ Top Scores ★</div>
+          <div id="leaderboardMenu" class="board"></div>
+        </div>
+
+      </div>
+    </div>
   </div>
 </div>
 
@@ -621,9 +671,9 @@ const coinsMenu=document.getElementById('coinsMenu');
 function updateMenuHiscore(){
   const top=loadScores();
   if(top[0] && top[0].score>highScore) highScore=top[0].score;
-  if(hiscoreMenu) hiscoreMenu.textContent='HIGH SCORE: '+highScore;
-  if(coinsMenu) coinsMenu.textContent='🪙 '+money+' COINS';
-  renderBoard(leaderboardMenu, 5, -1);
+  if(hiscoreMenu) hiscoreMenu.textContent=highScore;
+  if(coinsMenu) coinsMenu.textContent=money;
+  renderBoard(leaderboardMenu, 20, -1);
 }
 
 // ---- ARMORY (weapon upgrade shop) ----
@@ -799,7 +849,7 @@ function renderModes(){
 
 // ---- Menu tab + swipe system ----
 let menuPaneIdx=0;
-const MENU_PANE_N=3;
+const MENU_PANE_N=4;
 let _swX=0, _swY=0, _swActive=false;
 
 function goToPane(idx, skipAnim){
@@ -815,6 +865,7 @@ function goToPane(idx, skipAnim){
   if(menuPaneIdx===0) renderChars();
   if(menuPaneIdx===1) renderWeaponShop();
   if(menuPaneIdx===2) renderModes();
+  if(menuPaneIdx===3) renderBoard(leaderboardMenu, 20, -1);
 }
 
 // Tab click
@@ -2650,7 +2701,6 @@ function netTeardown(){
 document.getElementById('startBtn').onclick=startGame;
 // Online co-op paused: menu button removed (lobby code kept for later)
 const _onlineBtn=document.getElementById('onlineBtn'); if(_onlineBtn) _onlineBtn.onclick=openLobby;
-document.getElementById('armoryBtn').onclick=()=>{ ensureAudio(); goToPane(1); };
 document.getElementById('shopBackBtn').onclick=closeShop;
 document.getElementById('pauseBtn').onclick=openPause;
 document.getElementById('resumeBtn').onclick=resumeGame;
